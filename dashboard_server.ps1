@@ -53,6 +53,15 @@ while ($listener.IsListening) {
                 Send-Response $ctx ($data | ConvertTo-Json -Depth 3)
             } else { Send-Response $ctx "[]" }
         }
+        elseif ($path -eq "/api/consent") {
+            $logFile = "$BASE\consent_log.csv"
+            if (Test-Path $logFile) {
+                $data = Import-Csv $logFile | Select-Object -Last 200 | ForEach-Object {
+                    @{ time=$_.Timestamp; phone=$_.Phone; name=$_.Name; address=$_.Address; city=$_.City; price=$_.Price; status=$_.Status; followUpSent=$_.FollowUpSent; consentTime=$_.ConsentTime }
+                }
+                Send-Response $ctx ($data | ConvertTo-Json -Depth 3)
+            } else { Send-Response $ctx "[]" }
+        }
         elseif ($path -eq "/api/stats") {
             $emails  = if (Test-Path "$BASE\outreach_log.csv") { @(Import-Csv "$BASE\outreach_log.csv").Count } else { 0 }
             $replies = if (Test-Path "$BASE\replies_log.csv")  { @(Import-Csv "$BASE\replies_log.csv").Count  } else { 0 }

@@ -17,8 +17,30 @@ $CITIES = @(
     @{ name="Los Angeles, CA"; slug="Los+Angeles%2C+CA" }
 )
 
+$CONSENT_LOG = "$PSScriptRoot\consent_log.csv"
+
 if (-not (Test-Path $LOG_FILE)) {
     "Timestamp,AgentName,Phone,Address,Price,City,Role,CallId,Status" | Out-File $LOG_FILE -Encoding utf8
+}
+
+# Load consented phones — RULE: no YES = no call
+$consentedPhones = @{}
+if (Test-Path $CONSENT_LOG) {
+    Import-Csv $CONSENT_LOG | ForEach-Object {
+        $consentedPhones[$_.Phone] = $_.Status
+    }
+}
+
+function Test-Consent($phone) {
+    $status = $consentedPhones[$phone]
+    if ($status -eq "CONSENTED") { return $true }
+    if ($status -eq "OPTED_OUT") {
+        Write-Host "  [DNC] $phone is opted out — skipping" -ForegroundColor Red
+        return $false
+    }
+    # PENDING or unknown = no call allowed
+    Write-Host "  [NO CONSENT] $phone has not replied YES — SMS only" -ForegroundColor Yellow
+    return $false
 }
 
 Write-Host "================================================"
@@ -125,6 +147,9 @@ foreach ($city in $CITIES) {
         $firstName = ($lead.name -split " ")[0]
         $price     = "{0:N0}" -f [int]$lead.price
 
+        # CONSENT CHECK — no call without YES
+        if (-not (Test-Consent $lead.phone)) { continue }
+
         $task = "You are calling $firstName about their property at $($lead.address), listed at $price dollars. Ask if they have found a buyer yet or if they are still looking. If still looking, ask if they would like you to connect them with an agent who has qualified buyers right now. If yes, say you will have an agent call them shortly and end the call politely. If no, thank them and hang up. Keep it short and natural — under 60 seconds. No sales pitch, just a direct helpful question."
 
         $id = Invoke-Call $lead $task "OWNER"
@@ -144,6 +169,9 @@ foreach ($city in $CITIES) {
         $seenPhones[$lead.phone] = $true
 
         $firstName = ($lead.name -split " ")[0]
+
+        # CONSENT CHECK — no call without YES
+        if (-not (Test-Consent $lead.phone)) { continue }
 
         $task = "You are calling $firstName, a real estate agent in $($city.name). Say that you just spoke with property owners in the area who are looking for an agent with qualified buyers. Ask if they are currently taking new listings. If yes, say you will send their contact info to the owners today and end the call. If no, thank them and hang up. Under 45 seconds."
 

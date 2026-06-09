@@ -62,10 +62,11 @@
 </div>
 
 <!-- Tabs -->
-<div class="flex gap-2 mb-4">
+<div class="flex gap-2 mb-4 flex-wrap">
   <button onclick="showTab('calls')"   id="btn-calls"   class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white">📞 שיחות</button>
   <button onclick="showTab('emails')"  id="btn-emails"  class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">📧 אימיילים</button>
   <button onclick="showTab('replies')" id="btn-replies" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">💬 תשובות</button>
+  <button onclick="showTab('consent')" id="btn-consent" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">✅ הסכמות</button>
   <button onclick="showTab('live')"    id="btn-live"    class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">🎧 האזנה</button>
 </div>
 
@@ -124,6 +125,36 @@
   </div>
   <div id="replies-list" class="p-4 space-y-3">
     <p class="text-center text-gray-500 py-4">טוען...</p>
+  </div>
+</div>
+
+<!-- Consent Tab -->
+<div id="tab-consent" class="card overflow-hidden hidden">
+  <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+    <p class="font-semibold">✅ סטטוס הסכמות</p>
+    <div class="flex gap-2 text-xs">
+      <span class="bg-yellow-900 text-yellow-300 px-2 py-1 rounded-full" id="cnt-pending">ממתין 0</span>
+      <span class="bg-green-900 text-green-300 px-2 py-1 rounded-full" id="cnt-consented">אישר 0</span>
+      <span class="bg-red-900 text-red-300 px-2 py-1 rounded-full" id="cnt-optout">הסיר 0</span>
+    </div>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-800">
+        <tr>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">שם</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">טלפון</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">נכס</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">עיר</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">סטטוס</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">פולואפ</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">זמן</th>
+        </tr>
+      </thead>
+      <tbody id="consent-body">
+        <tr><td colspan="7" class="text-center py-8 text-gray-500">טוען...</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -206,6 +237,40 @@ async function loadReplies() {
     }).join('');
 }
 
+async function loadConsent() {
+    const data = await get('/api/consent');
+    const body = document.getElementById('consent-body');
+    if (!data || !data.length) {
+        body.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500">אין נתוני הסכמה עדיין</td></tr>';
+        return;
+    }
+    const pending   = data.filter(r => r.status === 'PENDING').length;
+    const consented = data.filter(r => r.status === 'CONSENTED').length;
+    const optout    = data.filter(r => r.status === 'OPTED_OUT').length;
+    document.getElementById('cnt-pending').textContent   = `ממתין ${pending}`;
+    document.getElementById('cnt-consented').textContent = `אישר ${consented}`;
+    document.getElementById('cnt-optout').textContent    = `הסיר ${optout}`;
+    body.innerHTML = [...data].reverse().map(r => {
+        const badge = r.status === 'CONSENTED'
+            ? '<span class="bg-green-900 text-green-300 text-xs px-2 py-1 rounded-full">✅ אישר</span>'
+            : r.status === 'OPTED_OUT'
+            ? '<span class="bg-red-900 text-red-300 text-xs px-2 py-1 rounded-full">🚫 הסיר</span>'
+            : '<span class="bg-yellow-900 text-yellow-300 text-xs px-2 py-1 rounded-full">⏳ ממתין</span>';
+        const followup = r.followUpSent === 'Yes'
+            ? '<span class="text-yellow-400 text-xs">נשלח</span>'
+            : '<span class="text-gray-500 text-xs">לא</span>';
+        return `<tr class="border-t border-gray-700 hover:bg-gray-800 transition">
+            <td class="px-4 py-3 font-medium text-xs">${r.name||'—'}</td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${r.phone||'—'}</td>
+            <td class="px-4 py-3 text-gray-300 text-xs max-w-xs truncate">${r.address||'—'}</td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${r.city||'—'}</td>
+            <td class="px-4 py-3">${badge}</td>
+            <td class="px-4 py-3">${followup}</td>
+            <td class="px-4 py-3 text-gray-500 text-xs">${(r.time||'').substring(0,16)}</td>
+        </tr>`;
+    }).join('');
+}
+
 async function loadAll() {
     await loadStats();
     await loadCalls();
@@ -255,11 +320,12 @@ function playRecording(url, audioId) {
 }
 
 function showTab(name) {
-    ['calls','emails','replies','live'].forEach(t => {
+    ['calls','emails','replies','consent','live'].forEach(t => {
         document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
         document.getElementById(`btn-${t}`).className = `tab-btn px-4 py-2 rounded-xl text-sm font-medium ${t===name?'bg-indigo-600 text-white':'bg-gray-700 text-gray-300'}`;
     });
     if (name === 'live') loadRecordings();
+    if (name === 'consent') loadConsent();
 }
 
 loadAll();

@@ -1,15 +1,66 @@
 # ZilloAgent - Auto Reply Handler
-# Reads Gmail replies, responds intelligently, alerts human on positive leads
+# Reads Gmail replies + Twilio SMS replies, handles YES/STOP consent
 
 $GMAIL_USER     = "yot70179@gmail.com"
 $GMAIL_PASSWORD = "cgal sjne nusb hmoa"
+$TWILIO_SID     = $env:TWILIO_ACCOUNT_SID
+$TWILIO_TOKEN   = $env:TWILIO_AUTH_TOKEN
+$TWILIO_FROM    = $env:TWILIO_PHONE_NUMBER
 $LOG_FILE       = "$PSScriptRoot\outreach_log.csv"
 $REPLY_LOG      = "$PSScriptRoot\replies_log.csv"
-$AGENT_EMAIL    = "yot70179@gmail.com"   # where HOT LEAD alerts go
+$CONSENT_LOG    = "$PSScriptRoot\consent_log.csv"
+$AGENT_EMAIL    = "yot70179@gmail.com"
 
 if (-not (Test-Path $REPLY_LOG)) {
     "Timestamp,FromEmail,FromName,Subject,Sentiment,Action" | Out-File $REPLY_LOG -Encoding utf8
 }
+if (-not (Test-Path $CONSENT_LOG)) {
+    "Timestamp,Phone,Name,Address,City,Price,Status,FollowUpSent,ConsentTime" | Out-File $CONSENT_LOG -Encoding utf8
+}
+
+# ── Update consent log ────────────────────────────────────────────────────────
+function Update-ConsentStatus($phone, $status) {
+    if (-not (Test-Path $CONSENT_LOG)) { return }
+    $rows = Import-Csv $CONSENT_LOG
+    $ts   = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $updated = $rows | ForEach-Object {
+        if ($_.Phone -eq $phone) {
+            $_.Status      = $status
+            $_.ConsentTime = $ts
+        }
+        $_
+    }
+    $updated | Export-Csv $CONSENT_LOG -NoTypeInformation -Encoding utf8
+    Write-Host "  [CONSENT] $phone → $status" -ForegroundColor $(if ($status -eq "CONSENTED") {"Green"} elseif ($status -eq "OPTED_OUT") {"Red"} else {"Yellow"})
+}
+
+# ── Check Twilio SMS replies ──────────────────────────────────────────────────
+function Check-SMSReplies {
+    if (-not $TWILIO_SID -or -not $TWILIO_TOKEN) { return }
+    $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("${TWILIO_SID}:${TWILIO_TOKEN}"))
+    $headers = @{ Authorization = "Basic $auth" }
+    try {
+        $msgs = Invoke-RestMethod -Uri "https://api.twilio.com/2010-04-01/Accounts/$TWILIO_SID/Messages.json?Direction=inbound&PageSize=50" `
+            -Headers $headers -TimeoutSec 10
+        $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+        foreach ($msg in $msgs.messages) {
+            $from = $msg.from
+            $body = $msg.body.Trim().ToUpper()
+            if ($body -match "^YES") {
+                Update-ConsentStatus $from "CONSENTED"
+                "$ts,$from,,SMS-YES,,,,CONSENTED,CALL_QUEUED" | Out-File $REPLY_LOG -Append -Encoding utf8
+            } elseif ($body -match "^STOP|^UNSUBSCRIBE|^OPT.OUT|^CANCEL") {
+                Update-ConsentStatus $from "OPTED_OUT"
+                "$ts,$from,,SMS-STOP,,,,OPTED_OUT,DNC_ADDED" | Out-File $REPLY_LOG -Append -Encoding utf8
+            }
+        }
+    } catch {
+        Write-Host "  [SMS] Could not fetch Twilio messages: $($_.Exception.Message)" -ForegroundColor Yellow
+    }
+}
+
+Write-Host "Checking SMS replies..."
+Check-SMSReplies
 
 # ── Load outreach log (who we emailed) ────────────────────────────────────────
 function Get-ContactedEmails {
