@@ -19,6 +19,7 @@ from database import (
     Message, MessageStatus, Property, SessionLocal, create_tables,
 )
 from message_sender import MessageSender
+from zillow_client import ZillowClient
 
 logger = logging.getLogger(__name__)
 
