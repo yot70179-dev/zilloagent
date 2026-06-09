@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ZilloAgent Dashboard</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  body { font-family:'Inter',sans-serif; background:#0f1117; color:#e2e8f0; }
+  .card { background:#1a1d27; border:1px solid #2d3148; border-radius:16px; }
+  .badge-positive  { background:#065f46; color:#6ee7b7; }
+  .badge-negative  { background:#7f1d1d; color:#fca5a5; }
+  .badge-neutral   { background:#1e3a5f; color:#93c5fd; }
+  .badge-sent      { background:#1e3a5f; color:#93c5fd; }
+  .badge-initiated { background:#3b1f6e; color:#c4b5fd; }
+  .pulse { animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background:#1a1d27; }
+  ::-webkit-scrollbar-thumb { background:#4b5563; border-radius:2px; }
+</style>
+</head>
+<body class="min-h-screen p-6">
+
+<!-- Header -->
+<div class="flex items-center justify-between mb-6">
+  <div class="flex items-center gap-3">
+    <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-lg">Z</div>
+    <div>
+      <h1 class="text-xl font-bold">ZilloAgent</h1>
+      <p class="text-xs text-gray-500">לוח בקרה — LA Real Estate</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <div id="live-dot" class="flex items-center gap-2 text-sm text-green-400">
+      <div class="w-2 h-2 bg-green-400 rounded-full pulse"></div>
+      חי
+    </div>
+    <button onclick="loadAll()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-xl transition">רענן</button>
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <div class="card p-5">
+    <p class="text-xs text-gray-500 mb-1">אימיילים נשלחו</p>
+    <p class="text-3xl font-bold text-blue-400" id="stat-emails">—</p>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs text-gray-500 mb-1">שיחות טלפון</p>
+    <p class="text-3xl font-bold text-purple-400" id="stat-calls">—</p>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs text-gray-500 mb-1">תשובות</p>
+    <p class="text-3xl font-bold text-green-400" id="stat-replies">—</p>
+  </div>
+  <div class="card p-5">
+    <p class="text-xs text-gray-500 mb-1">לידים חמים 🔥</p>
+    <p class="text-3xl font-bold text-orange-400" id="stat-hot">—</p>
+  </div>
+</div>
+
+<!-- Tabs -->
+<div class="flex gap-2 mb-4">
+  <button onclick="showTab('calls')"   id="btn-calls"   class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white">📞 שיחות</button>
+  <button onclick="showTab('emails')"  id="btn-emails"  class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">📧 אימיילים</button>
+  <button onclick="showTab('replies')" id="btn-replies" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">💬 תשובות</button>
+  <button onclick="showTab('live')"    id="btn-live"    class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">🎧 האזנה</button>
+</div>
+
+<!-- Calls Tab -->
+<div id="tab-calls" class="card overflow-hidden">
+  <div class="p-4 border-b border-gray-700 flex items-center justify-between">
+    <p class="font-semibold">שיחות טלפון אחרונות</p>
+    <span class="text-xs text-gray-500">מ-(650) 383-1655</span>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-800">
+        <tr>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">שם סוכן</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">טלפון</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">נכס</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">מחיר</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">סטטוס</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">שעה</th>
+        </tr>
+      </thead>
+      <tbody id="calls-body">
+        <tr><td colspan="6" class="text-center py-8 text-gray-500">טוען...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Emails Tab -->
+<div id="tab-emails" class="card overflow-hidden hidden">
+  <div class="p-4 border-b border-gray-700">
+    <p class="font-semibold">אימיילים שנשלחו</p>
+  </div>
+  <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-800">
+        <tr>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">שם</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">אימייל</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">נכס</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">מחיר</th>
+          <th class="text-right px-4 py-3 text-xs text-gray-400">סטטוס</th>
+        </tr>
+      </thead>
+      <tbody id="emails-body">
+        <tr><td colspan="5" class="text-center py-8 text-gray-500">טוען...</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Replies Tab -->
+<div id="tab-replies" class="card overflow-hidden hidden">
+  <div class="p-4 border-b border-gray-700">
+    <p class="font-semibold">תשובות שהתקבלו</p>
+  </div>
+  <div id="replies-list" class="p-4 space-y-3">
+    <p class="text-center text-gray-500 py-4">טוען...</p>
+  </div>
+</div>
+
+<!-- Live Calls / Recordings Tab -->
+<div id="tab-live" class="hidden space-y-3">
+  <div class="card p-4">
+    <p class="font-semibold mb-4">🎧 האזנה לשיחות — Bland.ai</p>
+    <div id="recordings-list"><p class="text-gray-500 text-sm text-center py-4">טוען שיחות...</p></div>
+  </div>
+</div>
+
+<script>
+const BLAND_KEY = 'org_ed8eb1111c2048a128c5cd35dbe2f256cb0430f51310cbcd2b0fddfdb4c1feec7558238acb59265bc98369';
+const API = 'http://localhost:8181';
+
+async function get(path) {
+    try {
+        const r = await fetch(API + path, { signal: AbortSignal.timeout(4000) });
+        return await r.json();
+    } catch { return null; }
+}
+
+async function loadStats() {
+    const s = await get('/api/stats');
+    if (!s) { document.getElementById('live-dot').innerHTML = '<div class="w-2 h-2 bg-red-400 rounded-full"></div><span class="text-red-400 text-sm">לא מחובר</span>'; return; }
+    document.getElementById('stat-emails').textContent  = s.emails  || 0;
+    document.getElementById('stat-calls').textContent   = s.calls   || 0;
+    document.getElementById('stat-replies').textContent = s.replies || 0;
+    document.getElementById('stat-hot').textContent     = s.hotLeads|| 0;
+}
+
+async function loadCalls() {
+    const data = await get('/api/calls');
+    const body = document.getElementById('calls-body');
+    if (!data || !data.length) { body.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">אין שיחות עדיין</td></tr>'; return; }
+    body.innerHTML = [...data].reverse().map(c => `
+        <tr class="border-t border-gray-700 hover:bg-gray-800 transition">
+            <td class="px-4 py-3 font-medium">${c.name||'—'}</td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${c.phone||'—'}</td>
+            <td class="px-4 py-3 text-gray-300 text-xs max-w-xs truncate">${c.address||'—'}</td>
+            <td class="px-4 py-3 text-green-400 text-xs">$${Number(c.price||0).toLocaleString()}</td>
+            <td class="px-4 py-3"><span class="badge-initiated text-xs px-2 py-1 rounded-full">${c.status||'—'}</span></td>
+            <td class="px-4 py-3 text-gray-500 text-xs">${(c.time||'').substring(11,16)}</td>
+        </tr>`).join('');
+}
+
+async function loadEmails() {
+    const data = await get('/api/emails');
+    const body = document.getElementById('emails-body');
+    if (!data || !data.length) { body.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">אין אימיילים עדיין</td></tr>'; return; }
+    body.innerHTML = [...data].reverse().map(e => `
+        <tr class="border-t border-gray-700 hover:bg-gray-800 transition">
+            <td class="px-4 py-3 font-medium">${e.name||'—'}</td>
+            <td class="px-4 py-3 text-blue-400 text-xs">${e.email||'—'}</td>
+            <td class="px-4 py-3 text-gray-300 text-xs max-w-xs truncate">${e.address||'—'}</td>
+            <td class="px-4 py-3 text-green-400 text-xs">$${Number(e.price||0).toLocaleString()}</td>
+            <td class="px-4 py-3"><span class="badge-sent text-xs px-2 py-1 rounded-full">${e.status||'—'}</span></td>
+        </tr>`).join('');
+}
+
+async function loadReplies() {
+    const data = await get('/api/replies');
+    const list = document.getElementById('replies-list');
+    if (!data || !data.length) { list.innerHTML = '<p class="text-center text-gray-500 py-4">אין תשובות עדיין</p>'; return; }
+    list.innerHTML = [...data].reverse().map(r => {
+        const cls = r.sentiment==='POSITIVE'?'badge-positive':r.sentiment==='NEGATIVE'?'badge-negative':'badge-neutral';
+        const emoji = r.sentiment==='POSITIVE'?'🔥':r.sentiment==='NEGATIVE'?'❌':'💬';
+        return `
+        <div class="bg-gray-800 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+                <div>
+                    <p class="font-medium">${r.name||r.email}</p>
+                    <p class="text-xs text-gray-400">${r.email}</p>
+                </div>
+                <span class="${cls} text-xs px-2 py-1 rounded-full">${emoji} ${r.sentiment}</span>
+            </div>
+            <p class="text-sm text-gray-300">${r.subject||''}</p>
+            <p class="text-xs text-gray-500 mt-1">${(r.time||'').substring(0,16)}</p>
+        </div>`;
+    }).join('');
+}
+
+async function loadAll() {
+    await loadStats();
+    await loadCalls();
+    await loadEmails();
+    await loadReplies();
+}
+
+async function loadRecordings() {
+    try {
+        const r = await fetch('https://api.bland.ai/v1/calls?limit=20', {
+            headers: { 'authorization': BLAND_KEY }
+        });
+        const data = await r.json();
+        const calls = data.calls || [];
+        const list = document.getElementById('recordings-list');
+        if (!calls.length) { list.innerHTML = '<p class="text-gray-500 text-center py-4">אין שיחות עדיין</p>'; return; }
+        list.innerHTML = calls.map(c => {
+            const status = c.status === 'completed' ? '✅' : c.status === 'failed' ? '❌' : '🔄';
+            const duration = c.call_length ? `${Math.round(c.call_length)}s` : '—';
+            const answered = c.answered_by === 'human' ? '👤 אדם' : c.answered_by === 'voicemail' ? '📭 תא קולי' : '—';
+            const transcript = c.transcripts ? c.transcripts.map(t => `<p class="text-xs ${t.user==='assistant'?'text-indigo-300':'text-gray-300'}">${t.user==='assistant'?'🤖':'👤'} ${t.text}</p>`).join('') : '';
+            return `
+            <div class="bg-gray-800 rounded-xl p-4 mb-3">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <p class="font-medium text-sm">${status} ${c.to || '—'}</p>
+                        <p class="text-xs text-gray-400">${answered} · ${duration} · ${(c.created_at||'').substring(0,16)}</p>
+                    </div>
+                    ${c.recording_url ? `
+                    <button onclick="playRecording('${c.recording_url}','audio-${c.call_id}')"
+                        class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg transition">
+                        ▶ האזן
+                    </button>` : '<span class="text-xs text-gray-500">אין הקלטה</span>'}
+                </div>
+                <audio id="audio-${c.call_id}" class="w-full mt-2 hidden" controls></audio>
+                ${transcript ? `<div class="mt-3 space-y-1 border-t border-gray-700 pt-3 max-h-32 overflow-y-auto">${transcript}</div>` : ''}
+            </div>`;
+        }).join('');
+    } catch(e) { document.getElementById('recordings-list').innerHTML = '<p class="text-red-400 text-sm text-center py-4">שגיאה בטעינת שיחות</p>'; }
+}
+
+function playRecording(url, audioId) {
+    const audio = document.getElementById(audioId);
+    audio.classList.remove('hidden');
+    audio.src = url;
+    audio.play();
+}
+
+function showTab(name) {
+    ['calls','emails','replies','live'].forEach(t => {
+        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
+        document.getElementById(`btn-${t}`).className = `tab-btn px-4 py-2 rounded-xl text-sm font-medium ${t===name?'bg-indigo-600 text-white':'bg-gray-700 text-gray-300'}`;
+    });
+    if (name === 'live') loadRecordings();
+}
+
+loadAll();
+setInterval(loadAll, 15000);
+</script>
+</body>
+</html>

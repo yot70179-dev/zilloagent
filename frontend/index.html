@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ZilloAgent — לוח בקרה</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .tab-active { border-bottom: 3px solid #6366f1; color: #6366f1; font-weight: 600; }
+    .status-new        { background:#dbeafe; color:#1d4ed8; }
+    .status-contacted  { background:#fef9c3; color:#854d0e; }
+    .status-responded  { background:#dcfce7; color:#166534; }
+    .status-qualified  { background:#f3e8ff; color:#6b21a8; }
+    .status-handed_off { background:#d1fae5; color:#065f46; }
+    .status-opted_out  { background:#fee2e2; color:#991b1b; }
+    .msg-out { background:#6366f1; color:white; border-radius:18px 18px 4px 18px; }
+    .msg-in  { background:#f1f5f9; color:#1e293b; border-radius:18px 18px 18px 4px; }
+    .spinner { animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+<!-- Header -->
+<header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
+  <div class="flex items-center gap-3">
+    <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
+      <span class="text-white font-bold text-sm">Z</span>
+    </div>
+    <div>
+      <h1 class="text-lg font-bold text-gray-900">ZilloAgent</h1>
+      <p class="text-xs text-gray-400">סוכן נדל"ן AI</p>
+    </div>
+  </div>
+  <div class="flex items-center gap-3">
+    <div id="api-status" class="flex items-center gap-2 text-sm px-3 py-1.5 rounded-full bg-gray-100">
+      <div class="w-2 h-2 rounded-full bg-gray-400" id="status-dot"></div>
+      <span id="status-text" class="text-gray-500">מתחבר...</span>
+    </div>
+    <input id="api-url" type="text" value="http://localhost:8000"
+      class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 w-48 text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+      placeholder="http://localhost:8000" />
+    <button onclick="refreshAll()" class="bg-indigo-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition">
+      רענן
+    </button>
+  </div>
+</header>
+
+<!-- Tabs -->
+<nav class="bg-white border-b border-gray-200 px-6">
+  <div class="flex gap-6">
+    <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition tab-active">
+      📊 לוח בקרה
+    </button>
+    <button onclick="showTab('leads')" id="tab-leads" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition">
+      👥 לידים
+    </button>
+    <button onclick="showTab('inbox')" id="tab-inbox" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition">
+      💬 שיחות
+    </button>
+    <button onclick="showTab('campaigns')" id="tab-campaigns" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition">
+      🚀 קמפיינים
+    </button>
+  </div>
+</nav>
+
+<!-- Main -->
+<main class="max-w-7xl mx-auto px-6 py-6">
+
+  <!-- DASHBOARD TAB -->
+  <div id="tab-dashboard-content">
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-400 mb-1">הודעות היום</p>
+        <p class="text-3xl font-bold text-indigo-600" id="stat-sent">—</p>
+        <p class="text-xs text-gray-400 mt-1">מתוך <span id="stat-limit">250</span></p>
+      </div>
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-400 mb-1">תשובות היום</p>
+        <p class="text-3xl font-bold text-green-500" id="stat-replies">—</p>
+        <p class="text-xs text-gray-400 mt-1">אחוז מענה</p>
+      </div>
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-400 mb-1">לידים חמים</p>
+        <p class="text-3xl font-bold text-orange-500" id="stat-hot">—</p>
+        <p class="text-xs text-gray-400 mt-1">ציון ≥ 7</p>
+      </div>
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+        <p class="text-xs text-gray-400 mb-1">ממתינים להעברה</p>
+        <p class="text-3xl font-bold text-purple-500" id="stat-handoff">—</p>
+        <p class="text-xs text-gray-400 mt-1">לסוכן אנושי</p>
+      </div>
+    </div>
+
+    <!-- Pipeline -->
+    <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
+      <h2 class="font-semibold text-gray-800 mb-4">Pipeline לידים</h2>
+      <div class="flex gap-3 overflow-x-auto pb-2">
+        <div class="pipeline-col flex-1 min-w-32 bg-blue-50 rounded-xl p-3">
+          <p class="text-xs font-semibold text-blue-700 mb-2">🆕 חדש</p>
+          <div id="pipe-new" class="space-y-2"></div>
+        </div>
+        <div class="pipeline-col flex-1 min-w-32 bg-yellow-50 rounded-xl p-3">
+          <p class="text-xs font-semibold text-yellow-700 mb-2">📤 נשלח</p>
+          <div id="pipe-contacted" class="space-y-2"></div>
+        </div>
+        <div class="pipeline-col flex-1 min-w-32 bg-green-50 rounded-xl p-3">
+          <p class="text-xs font-semibold text-green-700 mb-2">💬 ענה</p>
+          <div id="pipe-responded" class="space-y-2"></div>
+        </div>
+        <div class="pipeline-col flex-1 min-w-32 bg-purple-50 rounded-xl p-3">
+          <p class="text-xs font-semibold text-purple-700 mb-2">⭐ מוסמך</p>
+          <div id="pipe-qualified" class="space-y-2"></div>
+        </div>
+        <div class="pipeline-col flex-1 min-w-32 bg-teal-50 rounded-xl p-3">
+          <p class="text-xs font-semibold text-teal-700 mb-2">✅ הועבר</p>
+          <div id="pipe-handed_off" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hot Leads Alert -->
+    <div id="hot-leads-section" class="hidden">
+      <h2 class="font-semibold text-gray-800 mb-3">🔥 לידים חמים — דורשים תשומת לב</h2>
+      <div id="hot-leads-list" class="space-y-3"></div>
+    </div>
+  </div>
+
+  <!-- LEADS TAB -->
+  <div id="tab-leads-content" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-gray-800">כל הלידים</h2>
+      <div class="flex gap-2">
+        <select id="leads-filter-status" onchange="loadLeads()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+          <option value="">כל הסטטוסים</option>
+          <option value="new">חדש</option>
+          <option value="contacted">נשלח</option>
+          <option value="responded">ענה</option>
+          <option value="qualified">מוסמך</option>
+          <option value="handed_off">הועבר</option>
+        </select>
+        <select id="leads-filter-score" onchange="loadLeads()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+          <option value="">כל הציונים</option>
+          <option value="7">ציון ≥ 7 (חמים)</option>
+          <option value="5">ציון ≥ 5</option>
+        </select>
+      </div>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">שם</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">נכס</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">אימייל</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">ציון</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">סטטוס</th>
+            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">פעולה</th>
+          </tr>
+        </thead>
+        <tbody id="leads-table-body">
+          <tr><td colspan="6" class="text-center py-8 text-gray-400">טוען...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- INBOX TAB -->
+  <div id="tab-inbox-content" class="hidden">
+    <div class="flex gap-4 h-[calc(100vh-220px)]">
+      <!-- Conversations list -->
+      <div class="w-80 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
+        <div class="p-4 border-b border-gray-100">
+          <p class="font-semibold text-gray-800 text-sm">שיחות</p>
+        </div>
+        <div id="conv-list" class="overflow-y-auto flex-1"></div>
+      </div>
+      <!-- Chat window -->
+      <div class="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+        <div id="chat-header" class="p-4 border-b border-gray-100 flex items-center justify-between">
+          <div>
+            <p class="font-semibold text-gray-800 text-sm" id="chat-name">בחר שיחה</p>
+            <p class="text-xs text-gray-400" id="chat-property">—</p>
+          </div>
+          <div class="flex gap-2" id="chat-actions" style="display:none!important">
+            <button id="btn-takeover" onclick="takeoverLead()" class="text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg hover:bg-orange-200 transition">
+              השתלט על השיחה
+            </button>
+          </div>
+        </div>
+        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
+          <div class="text-center text-gray-400 text-sm mt-20">בחר שיחה מהרשימה</div>
+        </div>
+        <!-- Human reply input -->
+        <div id="chat-input-area" class="hidden p-4 border-t border-gray-100 flex gap-2">
+          <input id="human-reply" type="text" placeholder="כתוב תשובה..."
+            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+            onkeydown="if(event.key==='Enter') sendHumanReply()" />
+          <button onclick="sendHumanReply()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition">
+            שלח
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAMPAIGNS TAB -->
+  <div id="tab-campaigns-content" class="hidden">
+    <div class="flex items-center justify-between mb-4">
+      <h2 class="font-semibold text-gray-800">קמפיינים</h2>
+      <button onclick="openNewCampaign()" class="bg-indigo-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-indigo-700 transition">
+        + קמפיין חדש
+      </button>
+    </div>
+
+    <!-- New Campaign Form -->
+    <div id="new-campaign-form" class="hidden bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-4">
+      <h3 class="font-semibold text-gray-800 mb-4">קמפיין חדש</h3>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">שם הקמפיין</label>
+          <input id="c-name" type="text" placeholder="לוס אנג'לס Q3"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">אזור יעד</label>
+          <input id="c-area" type="text" placeholder="Los Angeles"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">מחיר מינימום ($)</label>
+          <input id="c-min" type="number" placeholder="200000"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">מחיר מקסימום ($)</label>
+          <input id="c-max" type="number" placeholder="2000000"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">סגנון הודעה</label>
+          <select id="c-style" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            <option value="professional">מקצועי</option>
+            <option value="friendly">ידידותי</option>
+            <option value="direct">ישיר</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-xs text-gray-500 mb-1 block">מגבלה יומית</label>
+          <input id="c-limit" type="number" value="250"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+        </div>
+      </div>
+      <div class="flex gap-2 mt-4">
+        <button onclick="createCampaign()" class="bg-indigo-600 text-white text-sm px-5 py-2 rounded-xl hover:bg-indigo-700 transition">
+          צור קמפיין
+        </button>
+        <button onclick="document.getElementById('new-campaign-form').classList.add('hidden')"
+          class="text-sm text-gray-500 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
+          ביטול
+        </button>
+      </div>
+    </div>
+
+    <div id="campaigns-list" class="space-y-3"></div>
+  </div>
+
+</main>
+
+<!-- Lead Detail Modal -->
+<div id="lead-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-bold text-gray-800" id="modal-name">—</h3>
+      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+    </div>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ─── State ────────────────────────────────────────────────────────────────────
+let API = 'http://localhost:8000';
+let currentLeadId = null;
+let currentLeadHuman = false;
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  API = document.getElementById('api-url').value;
+  document.getElementById('api-url').addEventListener('change', e => { API = e.target.value; refreshAll(); });
+  checkStatus();
+  refreshAll();
+  setInterval(refreshAll, 15000);
+});
+
+async function api(path, opts = {}) {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 4000);
+  try {
+    const r = await fetch(API + path, {
+      headers: {'Content-Type':'application/json'},
+      signal: controller.signal,
+      ...opts
+    });
+    clearTimeout(tid);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  } catch(e) {
+    clearTimeout(tid);
+    throw e;
+  }
+}
+
+async function checkStatus() {
+  try {
+    await api('/health');
+    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-green-500';
+    document.getElementById('status-text').textContent = 'מחובר';
+    document.getElementById('status-text').className = 'text-green-600';
+  } catch {
+    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-400';
+    document.getElementById('status-text').textContent = 'לא מחובר';
+    document.getElementById('status-text').className = 'text-red-500';
+  }
+}
+
+function refreshAll() {
+  checkStatus();
+  const tab = document.querySelector('.tab-active')?.id?.replace('tab-','');
+  if (tab === 'dashboard') loadDashboard();
+  else if (tab === 'leads') loadLeads();
+  else if (tab === 'inbox') loadInbox();
+  else if (tab === 'campaigns') loadCampaigns();
+  else loadDashboard();
+}
+
+// ─── Tabs ─────────────────────────────────────────────────────────────────────
+function showTab(name) {
+  document.querySelectorAll('[id^="tab-"][id$="-content"]').forEach(el => el.classList.add('hidden'));
+  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('tab-active'));
+  document.getElementById(`tab-${name}-content`).classList.remove('hidden');
+  document.getElementById(`tab-${name}`).classList.add('tab-active');
+  if (name === 'dashboard') loadDashboard();
+  else if (name === 'leads') loadLeads();
+  else if (name === 'inbox') loadInbox();
+  else if (name === 'campaigns') loadCampaigns();
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const stats = await api('/stats/today');
+    document.getElementById('stat-sent').textContent = stats.messages_sent_today;
+    document.getElementById('stat-limit').textContent = 250 - (stats.daily_limit_remaining||0) + '/' + 250;
+    document.getElementById('stat-replies').textContent = stats.replies_today;
+    document.getElementById('stat-hot').textContent = stats.hot_leads;
+    document.getElementById('stat-handoff').textContent = stats.pending_handoffs;
+
+    const leads = await api('/leads?limit=200');
+    renderPipeline(leads.items || []);
+    renderHotLeads((leads.items || []).filter(l => l.score >= 7 && !l.human_takeover));
+  } catch(e) { console.error(e); }
+}
+
+function renderPipeline(leads) {
+  const cols = ['new','contacted','responded','qualified','handed_off'];
+  cols.forEach(s => document.getElementById(`pipe-${s}`).innerHTML = '');
+  leads.forEach(l => {
+    const col = document.getElementById(`pipe-${l.status}`);
+    if (!col) return;
+    const card = document.createElement('div');
+    card.className = 'bg-white rounded-lg p-2 text-xs shadow-sm cursor-pointer hover:ring-2 hover:ring-indigo-300 transition';
+    card.innerHTML = `
+      <p class="font-semibold text-gray-700 truncate">${l.contact_name||'—'}</p>
+      <p class="text-gray-400 truncate">${l.property?.address||'—'}</p>
+      ${l.score > 0 ? `<div class="mt-1"><span class="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-xs">⭐ ${l.score.toFixed(1)}</span></div>` : ''}
+    `;
+    card.onclick = () => openLeadModal(l);
+    col.appendChild(card);
+  });
+}
+
+function renderHotLeads(leads) {
+  const section = document.getElementById('hot-leads-section');
+  const list = document.getElementById('hot-leads-list');
+  if (!leads.length) { section.classList.add('hidden'); return; }
+  section.classList.remove('hidden');
+  list.innerHTML = leads.map(l => `
+    <div class="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center justify-between">
+      <div>
+        <p class="font-semibold text-gray-800">${l.contact_name||'—'}</p>
+        <p class="text-sm text-gray-500">${l.property?.address||'—'} · $${(l.property?.price||0).toLocaleString()}</p>
+        <p class="text-xs text-gray-400 mt-1">אימייל: ${l.contact_email||'—'}</p>
+      </div>
+      <div class="text-left flex flex-col items-end gap-2">
+        <span class="text-2xl font-bold text-orange-500">${l.score.toFixed(1)}</span>
+        <button onclick="openConversation(${l.id})" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition">
+          פתח שיחה
+        </button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ─── Leads ────────────────────────────────────────────────────────────────────
+async function loadLeads() {
+  const status = document.getElementById('leads-filter-status')?.value || '';
+  const minScore = document.getElementById('leads-filter-score')?.value || '';
+  let url = '/leads?limit=100';
+  if (status) url += `&status=${status}`;
+  if (minScore) url += `&min_score=${minScore}`;
+  try {
+    const data = await api(url);
+    const body = document.getElementById('leads-table-body');
+    if (!data.items?.length) {
+      body.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">אין לידים עדיין</td></tr>';
+      return;
+    }
+    body.innerHTML = data.items.map(l => `
+      <tr class="border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer" onclick="openLeadModal(${JSON.stringify(l).replace(/"/g,'&quot;')})">
+        <td class="px-4 py-3">
+          <p class="font-medium text-gray-800">${l.contact_name||'—'}</p>
+          ${l.human_takeover ? '<span class="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">👤 אנושי</span>' : ''}
+        </td>
+        <td class="px-4 py-3 text-gray-500 text-xs max-w-48 truncate">${l.property?.address||'—'}<br><span class="text-gray-400">$${(l.property?.price||0).toLocaleString()}</span></td>
+        <td class="px-4 py-3 text-gray-500 text-xs">${l.contact_email||'—'}</td>
+        <td class="px-4 py-3">
+          ${l.score > 0 ? `<div class="flex items-center gap-1">
+            <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div class="h-full rounded-full ${l.score>=7?'bg-orange-500':l.score>=5?'bg-yellow-400':'bg-green-400'}" style="width:${l.score*10}%"></div>
+            </div>
+            <span class="text-xs font-semibold ${l.score>=7?'text-orange-600':'text-gray-600'}">${l.score.toFixed(1)}</span>
+          </div>` : '<span class="text-gray-300 text-xs">—</span>'}
+        </td>
+        <td class="px-4 py-3"><span class="status-${l.status} text-xs px-2 py-1 rounded-full font-medium">${statusLabel(l.status)}</span></td>
+        <td class="px-4 py-3">
+          <button onclick="event.stopPropagation(); openConversation(${l.id})" class="text-xs text-indigo-600 hover:underline">שיחה</button>
+        </td>
+      </tr>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+function statusLabel(s) {
+  return {new:'חדש',contacted:'נשלח',responded:'ענה',qualified:'מוסמך',handed_off:'הועבר',opted_out:'הסיר'}[s]||s;
+}
+
+// ─── Inbox / Conversations ────────────────────────────────────────────────────
+async function loadInbox() {
+  try {
+    const data = await api('/leads?limit=100');
+    const list = document.getElementById('conv-list');
+    const active = (data.items||[]).filter(l => l.status !== 'new' && l.status !== 'opted_out');
+    if (!active.length) {
+      list.innerHTML = '<div class="p-4 text-sm text-gray-400 text-center">אין שיחות עדיין</div>';
+      return;
+    }
+    list.innerHTML = active.map(l => `
+      <div onclick="openConversation(${l.id})" class="p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition ${currentLeadId===l.id?'bg-indigo-50':''}" id="conv-item-${l.id}">
+        <div class="flex items-center justify-between">
+          <p class="text-sm font-medium text-gray-800 truncate">${l.contact_name||'—'}</p>
+          ${l.score > 0 ? `<span class="text-xs font-bold ${l.score>=7?'text-orange-500':'text-gray-400'}">${l.score.toFixed(1)}</span>` : ''}
+        </div>
+        <p class="text-xs text-gray-400 truncate">${l.property?.address||'—'}</p>
+        <div class="flex items-center gap-1 mt-1">
+          <span class="status-${l.status} text-xs px-1.5 py-0.5 rounded-full">${statusLabel(l.status)}</span>
+          ${l.human_takeover ? '<span class="text-xs text-orange-600">👤</span>' : ''}
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+async function openConversation(leadId) {
+  showTab('inbox');
+  currentLeadId = leadId;
+  try {
+    const data = await api(`/leads/${leadId}/conversation`);
+    const lead = await api(`/leads/${leadId}`);
+    currentLeadHuman = data.human_takeover;
+
+    document.getElementById('chat-name').textContent = lead.contact_name || '—';
+    document.getElementById('chat-property').textContent = (lead.property?.address||'—') + ' · $' + (lead.property?.price||0).toLocaleString();
+
+    const actionsEl = document.getElementById('chat-actions');
+    actionsEl.style.display = 'flex';
+    const btnTakeover = document.getElementById('btn-takeover');
+    if (data.human_takeover) {
+      btnTakeover.textContent = '✅ שיחה בניהול אנושי';
+      btnTakeover.className = 'text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg';
+      btnTakeover.onclick = null;
+      document.getElementById('chat-input-area').classList.remove('hidden');
+    } else {
+      btnTakeover.textContent = '👤 השתלט על השיחה';
+      btnTakeover.className = 'text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg hover:bg-orange-200 transition';
+      btnTakeover.onclick = () => takeoverLead();
+      document.getElementById('chat-input-area').classList.add('hidden');
+    }
+
+    const msgs = document.getElementById('chat-messages');
+    if (!data.messages?.length) {
+      msgs.innerHTML = '<div class="text-center text-gray-400 text-sm mt-10">אין הודעות עדיין</div>';
+      return;
+    }
+    msgs.innerHTML = data.messages.map(m => `
+      <div class="flex ${m.role==='assistant'?'justify-end':'justify-start'}">
+        <div class="${m.role==='assistant'?'msg-out':'msg-in'} max-w-xs px-4 py-2.5 text-sm">
+          ${m.content.startsWith('[HUMAN]') ? '<span class="text-xs opacity-70">👤 סוכן: </span>' : ''}
+          ${m.content.replace('[HUMAN] ','')}
+          <p class="text-xs opacity-50 mt-1">${new Date(m.timestamp).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</p>
+        </div>
+      </div>
+    `).join('');
+    msgs.scrollTop = msgs.scrollHeight;
+
+    // highlight in list
+    document.querySelectorAll('[id^="conv-item-"]').forEach(el => el.classList.remove('bg-indigo-50'));
+    const item = document.getElementById(`conv-item-${leadId}`);
+    if (item) item.classList.add('bg-indigo-50');
+  } catch(e) { console.error(e); }
+}
+
+async function takeoverLead() {
+  if (!currentLeadId) return;
+  try {
+    await api(`/leads/${currentLeadId}/takeover`, {
+      method: 'POST',
+      body: JSON.stringify({ agent_name: 'Human Agent' })
+    });
+    openConversation(currentLeadId);
+  } catch(e) { alert('שגיאה: ' + e.message); }
+}
+
+async function sendHumanReply() {
+  const input = document.getElementById('human-reply');
+  const content = input.value.trim();
+  if (!content || !currentLeadId) return;
+  input.value = '';
+  try {
+    await api(`/leads/${currentLeadId}/message`, {
+      method: 'POST',
+      body: JSON.stringify({ content, channel: 'email' })
+    });
+    openConversation(currentLeadId);
+  } catch(e) { alert('שגיאה: ' + e.message); }
+}
+
+// ─── Campaigns ────────────────────────────────────────────────────────────────
+async function loadCampaigns() {
+  try {
+    const data = await api('/campaigns');
+    const list = document.getElementById('campaigns-list');
+    if (!data.length) {
+      list.innerHTML = '<div class="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm border border-gray-100">אין קמפיינים עדיין. צור קמפיין חדש.</div>';
+      return;
+    }
+    list.innerHTML = data.map(c => `
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
+        <div>
+          <div class="flex items-center gap-2 mb-1">
+            <p class="font-semibold text-gray-800">${c.name}</p>
+            <span class="text-xs px-2 py-0.5 rounded-full ${c.is_active?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}">${c.is_active?'פעיל':'מושהה'}</span>
+          </div>
+          <p class="text-sm text-gray-500">📍 ${c.target_area||'—'} · ${c.min_price?'$'+c.min_price.toLocaleString():''} – ${c.max_price?'$'+c.max_price.toLocaleString():''}</p>
+          <p class="text-xs text-gray-400 mt-1">מגבלה: ${c.daily_limit}/יום · סגנון: ${c.message_style}</p>
+        </div>
+        <div class="flex gap-2">
+          <button onclick="toggleCampaign(${c.id}, ${!c.is_active})" class="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition text-gray-600">
+            ${c.is_active?'השהה':'הפעל'}
+          </button>
+          <button onclick="runCampaign(${c.id})" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition">
+            ▶ הרץ עכשיו
+          </button>
+        </div>
+      </div>
+    `).join('');
+  } catch(e) { console.error(e); }
+}
+
+function openNewCampaign() {
+  document.getElementById('new-campaign-form').classList.toggle('hidden');
+}
+
+async function createCampaign() {
+  const payload = {
+    name: document.getElementById('c-name').value,
+    target_area: document.getElementById('c-area').value,
+    min_price: parseFloat(document.getElementById('c-min').value)||null,
+    max_price: parseFloat(document.getElementById('c-max').value)||null,
+    message_style: document.getElementById('c-style').value,
+    daily_limit: parseInt(document.getElementById('c-limit').value)||250,
+  };
+  if (!payload.name) { alert('חסר שם קמפיין'); return; }
+  try {
+    await api('/campaigns', { method:'POST', body: JSON.stringify(payload) });
+    document.getElementById('new-campaign-form').classList.add('hidden');
+    loadCampaigns();
+  } catch(e) { alert('שגיאה: '+e.message); }
+}
+
+async function toggleCampaign(id, active) {
+  try {
+    await api(`/campaigns/${id}`, { method:'PATCH', body: JSON.stringify({is_active: active}) });
+    loadCampaigns();
+  } catch(e) { alert('שגיאה: '+e.message); }
+}
+
+async function runCampaign(id) {
+  try {
+    await api(`/campaigns/${id}/run`, { method:'POST' });
+    alert('הקמפיין הועבר לתור — ישלח בקרוב!');
+  } catch(e) { alert('שגיאה: '+e.message); }
+}
+
+// ─── Lead Modal ───────────────────────────────────────────────────────────────
+function openLeadModal(lead) {
+  if (typeof lead === 'string') lead = JSON.parse(lead.replace(/&quot;/g,'"'));
+  document.getElementById('modal-name').textContent = lead.contact_name || '—';
+  document.getElementById('modal-content').innerHTML = `
+    <div class="space-y-3 text-sm">
+      <div class="grid grid-cols-2 gap-3">
+        <div class="bg-gray-50 rounded-xl p-3">
+          <p class="text-xs text-gray-400">אימייל</p>
+          <p class="font-medium">${lead.contact_email||'—'}</p>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-3">
+          <p class="text-xs text-gray-400">סטטוס</p>
+          <span class="status-${lead.status} text-xs px-2 py-1 rounded-full font-medium">${statusLabel(lead.status)}</span>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-3">
+          <p class="text-xs text-gray-400">ציון</p>
+          <p class="font-bold text-xl ${lead.score>=7?'text-orange-500':''}">${lead.score?.toFixed(1)||'0'}</p>
+        </div>
+        <div class="bg-gray-50 rounded-xl p-3">
+          <p class="text-xs text-gray-400">נכס</p>
+          <p class="font-medium text-xs">${lead.property?.address||'—'}</p>
+          <p class="text-gray-400 text-xs">$${(lead.property?.price||0).toLocaleString()}</p>
+        </div>
+      </div>
+      ${lead.timeline ? `<div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-gray-400">ציר זמן</p><p>${lead.timeline}</p></div>` : ''}
+      ${lead.notes ? `<div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-gray-400">הערות</p><p>${lead.notes}</p></div>` : ''}
+      <div class="flex gap-2 mt-2">
+        <button onclick="closeModal(); openConversation(${lead.id})" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm hover:bg-indigo-700 transition">
+          פתח שיחה
+        </button>
+        ${!lead.human_takeover ? `<button onclick="closeModal(); currentLeadId=${lead.id}; takeoverLead()" class="flex-1 bg-orange-100 text-orange-700 py-2 rounded-xl text-sm hover:bg-orange-200 transition">השתלט</button>` : ''}
+      </div>
+    </div>
+  `;
+  document.getElementById('lead-modal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('lead-modal').classList.add('hidden');
+}
+
+document.getElementById('lead-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('lead-modal')) closeModal();
+});
+</script>
+</body>
+</html>
