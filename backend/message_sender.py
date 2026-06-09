@@ -1,180 +1,108 @@
-"""
-Outbound message delivery via Twilio (SMS) or SendGrid (email).
-Hard limit: DAILY_MESSAGE_LIMIT messages per day across all channels.
-"""
+"""Send SMS and email using the agent's own credentials."""
 import logging
 import os
-from datetime import date, datetime
-from typing import Tuple
-
-from sqlalchemy.orm import Session
-
-from database import DailyStats, Lead, Message, MessageStatus
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-DAILY_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "250"))
-OPT_OUT_FOOTER_SMS = "\n\nReply STOP to unsubscribe."
-OPT_OUT_FOOTER_EMAIL = "\n\n---\nTo unsubscribe reply UNSUBSCRIBE or click the link below."
-
-
-class DailyLimitReached(Exception):
-    pass
+STOP_FOOTER_SMS   = "\nReply STOP to opt out."
+STOP_FOOTER_EMAIL = "\n\n---\nReply STOP to unsubscribe."
 
 
 class MessageSender:
-    def __init__(self, db: Session):
-        self.db = db
-        self._twilio = None
-        self._sg = None
+    def __init__(self, agent=None):
+        """
+        If agent is provided, use agent's credentials.
+        Otherwise fall back to env variables.
+        """
+        if agent:
+            self.twilio_sid   = agent.twilio_sid   or os.getenv("TWILIO_ACCOUNT_SID", "")
+            self.twilio_token = agent.twilio_token or os.getenv("TWILIO_AUTH_TOKEN", "")
+            self.twilio_from  = agent.twilio_phone  or os.getenv("TWILIO_PHONE_NUMBER", "")
+            self.gmail_user   = agent.gmail_user   or os.getenv("GMAIL_USER", "")
+            self.gmail_pass   = agent.gmail_password or os.getenv("GMAIL_APP_PASSWORD", "")
+            self.agent_name   = agent.name
+            self.bland_key    = agent.bland_key or os.getenv("BLANDAI_KEY", "")
+        else:
+            self.twilio_sid   = os.getenv("TWILIO_ACCOUNT_SID", "")
+            self.twilio_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+            self.twilio_from  = os.getenv("TWILIO_PHONE_NUMBER", "")
+            self.gmail_user   = os.getenv("GMAIL_USER", "")
+            self.gmail_pass   = os.getenv("GMAIL_APP_PASSWORD", "")
+            self.agent_name   = "Real Estate Acquisitions Team"
+            self.bland_key    = os.getenv("BLANDAI_KEY", "")
 
-    # ------------------------------------------------------------------
-    # Daily-limit helpers
-    # ------------------------------------------------------------------
-
-    def _today_start(self) -> datetime:
-        return datetime.combine(date.today(), datetime.min.time())
-
-    def _stats_today(self) -> DailyStats:
-        today_start = self._today_start()
-        stats = self.db.query(DailyStats).filter(DailyStats.date >= today_start).first()
-        if not stats:
-            stats = DailyStats(date=today_start, messages_sent=0, replies_received=0,
-                               leads_qualified=0, leads_handed_off=0)
-            self.db.add(stats)
-            self.db.commit()
-        return stats
-
-    def check_daily_limit(self) -> Tuple[bool, int]:
-        """Returns (can_send, remaining)."""
-        sent = self._stats_today().messages_sent
-        remaining = DAILY_LIMIT - sent
-        return remaining > 0, max(remaining, 0)
-
-    def _increment_sent(self):
-        stats = self._stats_today()
-        stats.messages_sent += 1
-        self.db.commit()
-
-    # ------------------------------------------------------------------
-    # Lazy-loaded SDK clients
-    # ------------------------------------------------------------------
-
-    @property
-    def twilio(self):
-        if self._twilio is None:
+    # ── SMS via agent's Twilio ────────────────────────────────────────────────
+    def send_sms(self, to: str, body: str) -> Optional[str]:
+        if not all([self.twilio_sid, self.twilio_token, self.twilio_from]):
+            logger.warning("Twilio credentials missing — SMS not sent to %s", to)
+            return None
+        try:
             from twilio.rest import Client
-            self._twilio = Client(
-                os.getenv("TWILIO_ACCOUNT_SID", ""),
-                os.getenv("TWILIO_AUTH_TOKEN", ""),
+            client = Client(self.twilio_sid, self.twilio_token)
+            msg = client.messages.create(
+                body=body + STOP_FOOTER_SMS,
+                from_=self.twilio_from,
+                to=to,
             )
-        return self._twilio
-
-    @property
-    def sendgrid(self):
-        if self._sg is None:
-            import sendgrid as sg
-            self._sg = sg.SendGridAPIClient(api_key=os.getenv("SENDGRID_API_KEY", ""))
-        return self._sg
-
-    # ------------------------------------------------------------------
-    # Send methods
-    # ------------------------------------------------------------------
-
-    def send_sms(self, lead: Lead, content: str, is_follow_up: bool = False) -> Message:
-        can_send, _ = self.check_daily_limit()
-        if not can_send:
-            raise DailyLimitReached(f"Daily limit of {DAILY_LIMIT} reached")
-        if lead.opted_out:
-            raise ValueError(f"Lead {lead.id} has opted out")
-        if not lead.contact_phone:
-            raise ValueError(f"Lead {lead.id} has no phone number")
-
-        msg = self._create_message_record(lead, "sms", content, is_follow_up=is_follow_up)
-
-        try:
-            tw_msg = self.twilio.messages.create(
-                body=content + OPT_OUT_FOOTER_SMS,
-                from_=os.getenv("TWILIO_PHONE_NUMBER", ""),
-                to=lead.contact_phone,
-            )
-            msg.status = MessageStatus.SENT
-            msg.external_id = tw_msg.sid
-            msg.sent_at = datetime.utcnow()
-            self.db.commit()
-            self._increment_sent()
-            logger.info("SMS sent lead=%s sid=%s", lead.id, tw_msg.sid)
+            logger.info("SMS sent to %s: %s", to, msg.sid)
+            return msg.sid
         except Exception as exc:
-            msg.status = MessageStatus.FAILED
-            self.db.commit()
-            logger.error("SMS failed lead=%s: %s", lead.id, exc)
-            raise
+            logger.error("SMS failed to %s: %s", to, exc)
+            return None
 
-        return msg
-
-    def send_email(
-        self,
-        lead: Lead,
-        content: str,
-        subject: str = "Property Opportunity",
-        is_follow_up: bool = False,
-    ) -> Message:
-        can_send, _ = self.check_daily_limit()
-        if not can_send:
-            raise DailyLimitReached(f"Daily limit of {DAILY_LIMIT} reached")
-        if lead.opted_out:
-            raise ValueError(f"Lead {lead.id} has opted out")
-        if not lead.contact_email:
-            raise ValueError(f"Lead {lead.id} has no email")
-
-        msg = self._create_message_record(lead, "email", content, subject=subject, is_follow_up=is_follow_up)
-
+    # ── Email via agent's Gmail ───────────────────────────────────────────────
+    def send_email(self, to_email: str, to_name: str, subject: str, body: str) -> bool:
+        if not all([self.gmail_user, self.gmail_pass]):
+            logger.warning("Gmail credentials missing — email not sent to %s", to_email)
+            return False
         try:
-            from sendgrid.helpers.mail import Mail
-            mail = Mail(
-                from_email=os.getenv("SENDGRID_FROM_EMAIL", ""),
-                to_emails=lead.contact_email,
-                subject=subject,
-                plain_text_content=content + OPT_OUT_FOOTER_EMAIL,
-            )
-            response = self.sendgrid.send(mail)
-            msg.status = MessageStatus.SENT
-            msg.external_id = (response.headers or {}).get("X-Message-Id", "")
-            msg.sent_at = datetime.utcnow()
-            self.db.commit()
-            self._increment_sent()
-            logger.info("Email sent lead=%s msg_id=%s", lead.id, msg.external_id)
+            msg = MIMEMultipart()
+            msg["From"]    = f"{self.agent_name} <{self.gmail_user}>"
+            msg["To"]      = f"{to_name} <{to_email}>"
+            msg["Subject"] = subject
+            msg.attach(MIMEText(body + STOP_FOOTER_EMAIL, "plain"))
+            with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
+                smtp.starttls()
+                smtp.login(self.gmail_user, self.gmail_pass)
+                smtp.send_message(msg)
+            logger.info("Email sent to %s", to_email)
+            return True
         except Exception as exc:
-            msg.status = MessageStatus.FAILED
-            self.db.commit()
-            logger.error("Email failed lead=%s: %s", lead.id, exc)
-            raise
+            logger.error("Email failed to %s: %s", to_email, exc)
+            return False
 
-        return msg
-
-    def handle_opt_out(self, lead: Lead):
-        lead.opted_out = True
-        lead.status = "opted_out"
-        self.db.commit()
-        logger.info("Lead %s opted out", lead.id)
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _create_message_record(
-        self, lead: Lead, msg_type: str, content: str,
-        subject: str | None = None, is_follow_up: bool = False,
-    ) -> Message:
-        record = Message(
-            lead_id=lead.id,
-            message_type=msg_type,
-            direction="outbound",
-            content=content,
-            subject=subject,
-            status=MessageStatus.PENDING,
-            is_follow_up=is_follow_up,
-        )
-        self.db.add(record)
-        self.db.commit()
-        return record
+    # ── Bland.ai call via agent's key ────────────────────────────────────────
+    def make_call(self, to: str, task: str, from_number: Optional[str] = None,
+                  record: bool = True, max_duration: int = 3) -> Optional[str]:
+        frm = from_number or self.twilio_from or os.getenv("FROM_NUMBER", "")
+        if not self.bland_key:
+            logger.warning("No Bland.ai key — call not made to %s", to)
+            return None
+        try:
+            import httpx
+            resp = httpx.post(
+                "https://api.bland.ai/v1/calls",
+                headers={"authorization": self.bland_key, "Content-Type": "application/json"},
+                json={
+                    "phone_number": to,
+                    "from": frm,
+                    "task": task,
+                    "voice": "nat",
+                    "wait_for_greeting": True,
+                    "record": record,
+                    "max_duration": max_duration,
+                    "answered_by_enabled": True,
+                },
+                timeout=15,
+            )
+            data = resp.json()
+            call_id = data.get("call_id")
+            logger.info("Call initiated to %s: %s", to, call_id)
+            return call_id
+        except Exception as exc:
+            logger.error("Call failed to %s: %s", to, exc)
+            return None

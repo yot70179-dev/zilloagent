@@ -1,672 +1,553 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ZilloAgent — לוח בקרה</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: { extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } } }
-    }
-  </script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <style>
-    body { font-family: 'Inter', sans-serif; }
-    .tab-active { border-bottom: 3px solid #6366f1; color: #6366f1; font-weight: 600; }
-    .status-new        { background:#dbeafe; color:#1d4ed8; }
-    .status-contacted  { background:#fef9c3; color:#854d0e; }
-    .status-responded  { background:#dcfce7; color:#166534; }
-    .status-qualified  { background:#f3e8ff; color:#6b21a8; }
-    .status-handed_off { background:#d1fae5; color:#065f46; }
-    .status-opted_out  { background:#fee2e2; color:#991b1b; }
-    .msg-out { background:#6366f1; color:white; border-radius:18px 18px 4px 18px; }
-    .msg-in  { background:#f1f5f9; color:#1e293b; border-radius:18px 18px 18px 4px; }
-    .spinner { animation: spin 1s linear infinite; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-    ::-webkit-scrollbar { width: 6px; }
-    ::-webkit-scrollbar-track { background: #f1f5f9; }
-    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>ZilloAgent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body{font-family:system-ui,-apple-system,sans-serif;background:#0f1117;color:#e2e8f0;}
+  .card{background:#1a1d27;border:1px solid #2d3148;border-radius:16px;}
+  .input{background:#1a1d27;border:1px solid #3d4168;border-radius:10px;padding:10px 14px;color:#e2e8f0;width:100%;outline:none;font-size:14px;}
+  .input:focus{border-color:#6366f1;}
+  .btn{padding:10px 20px;border-radius:10px;font-weight:600;cursor:pointer;transition:all .15s;font-size:14px;}
+  .btn-primary{background:#6366f1;color:#fff;border:none;}
+  .btn-primary:hover{background:#5557e8;}
+  .btn-secondary{background:#1a1d27;border:1px solid #3d4168;color:#e2e8f0;}
+  .btn-secondary:hover{border-color:#6366f1;}
+  .badge-pending{background:#422006;color:#fb923c;}
+  .badge-consented{background:#052e16;color:#4ade80;}
+  .badge-optedout{background:#450a0a;color:#f87171;}
+  .slide-in{animation:slideIn .18s ease-out;}
+  @keyframes slideIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-track{background:#1a1d27;}
+  ::-webkit-scrollbar-thumb{background:#4b5563;border-radius:2px;}
+  textarea.input{resize:none;}
+</style>
 </head>
-<body class="bg-gray-50 text-gray-900 min-h-screen">
+<body>
 
-<!-- Header -->
-<header class="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between sticky top-0 z-50 shadow-sm">
-  <div class="flex items-center gap-3">
-    <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center">
-      <span class="text-white font-bold text-sm">Z</span>
+<!-- ═══ AUTH ══════════════════════════════════════════════════════════════════ -->
+<div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-sm">
+    <!-- Logo -->
+    <div class="flex items-center gap-3 justify-center mb-8">
+      <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-bold text-white text-xl">Z</div>
+      <div>
+        <h1 class="text-2xl font-bold">ZilloAgent</h1>
+        <p class="text-xs text-gray-500">AI Real Estate Outreach</p>
+      </div>
     </div>
-    <div>
-      <h1 class="text-lg font-bold text-gray-900">ZilloAgent</h1>
-      <p class="text-xs text-gray-400">סוכן נדל"ן AI</p>
+
+    <!-- Login -->
+    <div id="login-form" class="card p-6">
+      <h2 class="text-lg font-semibold mb-5">Sign in</h2>
+      <div class="space-y-3">
+        <input id="login-email"    class="input" type="email"    placeholder="Email address" autocomplete="email"/>
+        <input id="login-password" class="input" type="password" placeholder="Password"      autocomplete="current-password"/>
+        <button onclick="doLogin()" class="btn btn-primary w-full">Sign in</button>
+      </div>
+      <p class="text-center text-sm text-gray-500 mt-4">
+        No account? <button onclick="showSignup()" class="text-indigo-400 hover:underline">Create one</button>
+      </p>
+      <div id="login-error" class="text-red-400 text-sm mt-3 hidden"></div>
+    </div>
+
+    <!-- Signup -->
+    <div id="signup-form" class="card p-6 hidden">
+      <h2 class="text-lg font-semibold mb-1">Create account</h2>
+      <p class="text-xs text-gray-500 mb-5">Connect your Twilio & Gmail after signup</p>
+      <div class="space-y-3">
+        <input id="signup-name"     class="input" type="text"     placeholder="Full name"/>
+        <input id="signup-email"    class="input" type="email"    placeholder="Email address"/>
+        <input id="signup-password" class="input" type="password" placeholder="Password (min 6 chars)"/>
+        <button onclick="doSignup()" class="btn btn-primary w-full">Create account</button>
+      </div>
+      <p class="text-center text-sm text-gray-500 mt-4">
+        Have an account? <button onclick="showLogin()" class="text-indigo-400 hover:underline">Sign in</button>
+      </p>
+      <div id="signup-error" class="text-red-400 text-sm mt-3 hidden"></div>
     </div>
   </div>
-  <div class="flex items-center gap-3">
-    <div id="api-status" class="flex items-center gap-2 text-sm px-3 py-1.5 rounded-full bg-gray-100">
-      <div class="w-2 h-2 rounded-full bg-gray-400" id="status-dot"></div>
-      <span id="status-text" class="text-gray-500">מתחבר...</span>
+</div>
+
+<!-- ═══ APP ════════════════════════════════════════════════════════════════════ -->
+<div id="app-screen" class="hidden min-h-screen pb-16">
+
+  <!-- Top Bar -->
+  <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800 sticky top-0 z-20" style="background:#0f1117;">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-sm">Z</div>
+      <span class="font-semibold text-sm">ZilloAgent</span>
     </div>
-    <input id="api-url" type="text" value="http://localhost:8000"
-      class="text-xs border border-gray-200 rounded-lg px-3 py-1.5 w-48 text-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-300"
-      placeholder="http://localhost:8000" />
-    <button onclick="refreshAll()" class="bg-indigo-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-indigo-700 transition">
-      רענן
-    </button>
-  </div>
-</header>
-
-<!-- Tabs -->
-<nav class="bg-white border-b border-gray-200 px-6">
-  <div class="flex gap-6">
-    <button onclick="showTab('dashboard')" id="tab-dashboard" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition tab-active">
-      📊 לוח בקרה
-    </button>
-    <button onclick="showTab('leads')" id="tab-leads" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition">
-      👥 לידים
-    </button>
-    <button onclick="showTab('inbox')" id="tab-inbox" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition">
-      💬 שיחות
-    </button>
-    <button onclick="showTab('campaigns')" id="tab-campaigns" class="tab-btn py-3 text-sm text-gray-500 hover:text-indigo-600 transition">
-      🚀 קמפיינים
-    </button>
-  </div>
-</nav>
-
-<!-- Main -->
-<main class="max-w-7xl mx-auto px-6 py-6">
-
-  <!-- DASHBOARD TAB -->
-  <div id="tab-dashboard-content">
-    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <p class="text-xs text-gray-400 mb-1">הודעות היום</p>
-        <p class="text-3xl font-bold text-indigo-600" id="stat-sent">—</p>
-        <p class="text-xs text-gray-400 mt-1">מתוך <span id="stat-limit">250</span></p>
-      </div>
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <p class="text-xs text-gray-400 mb-1">תשובות היום</p>
-        <p class="text-3xl font-bold text-green-500" id="stat-replies">—</p>
-        <p class="text-xs text-gray-400 mt-1">אחוז מענה</p>
-      </div>
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <p class="text-xs text-gray-400 mb-1">לידים חמים</p>
-        <p class="text-3xl font-bold text-orange-500" id="stat-hot">—</p>
-        <p class="text-xs text-gray-400 mt-1">ציון ≥ 7</p>
-      </div>
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-        <p class="text-xs text-gray-400 mb-1">ממתינים להעברה</p>
-        <p class="text-3xl font-bold text-purple-500" id="stat-handoff">—</p>
-        <p class="text-xs text-gray-400 mt-1">לסוכן אנושי</p>
-      </div>
-    </div>
-
-    <!-- Pipeline -->
-    <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 mb-6">
-      <h2 class="font-semibold text-gray-800 mb-4">Pipeline לידים</h2>
-      <div class="flex gap-3 overflow-x-auto pb-2">
-        <div class="pipeline-col flex-1 min-w-32 bg-blue-50 rounded-xl p-3">
-          <p class="text-xs font-semibold text-blue-700 mb-2">🆕 חדש</p>
-          <div id="pipe-new" class="space-y-2"></div>
-        </div>
-        <div class="pipeline-col flex-1 min-w-32 bg-yellow-50 rounded-xl p-3">
-          <p class="text-xs font-semibold text-yellow-700 mb-2">📤 נשלח</p>
-          <div id="pipe-contacted" class="space-y-2"></div>
-        </div>
-        <div class="pipeline-col flex-1 min-w-32 bg-green-50 rounded-xl p-3">
-          <p class="text-xs font-semibold text-green-700 mb-2">💬 ענה</p>
-          <div id="pipe-responded" class="space-y-2"></div>
-        </div>
-        <div class="pipeline-col flex-1 min-w-32 bg-purple-50 rounded-xl p-3">
-          <p class="text-xs font-semibold text-purple-700 mb-2">⭐ מוסמך</p>
-          <div id="pipe-qualified" class="space-y-2"></div>
-        </div>
-        <div class="pipeline-col flex-1 min-w-32 bg-teal-50 rounded-xl p-3">
-          <p class="text-xs font-semibold text-teal-700 mb-2">✅ הועבר</p>
-          <div id="pipe-handed_off" class="space-y-2"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Hot Leads Alert -->
-    <div id="hot-leads-section" class="hidden">
-      <h2 class="font-semibold text-gray-800 mb-3">🔥 לידים חמים — דורשים תשומת לב</h2>
-      <div id="hot-leads-list" class="space-y-3"></div>
+    <div class="flex items-center gap-3">
+      <span id="agent-name-badge" class="text-xs text-gray-400 truncate max-w-24"></span>
+      <button onclick="doLogout()" class="text-xs text-gray-500 hover:text-white">Sign out</button>
     </div>
   </div>
 
-  <!-- LEADS TAB -->
-  <div id="tab-leads-content" class="hidden">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-gray-800">כל הלידים</h2>
-      <div class="flex gap-2">
-        <select id="leads-filter-status" onchange="loadLeads()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-          <option value="">כל הסטטוסים</option>
-          <option value="new">חדש</option>
-          <option value="contacted">נשלח</option>
-          <option value="responded">ענה</option>
-          <option value="qualified">מוסמך</option>
-          <option value="handed_off">הועבר</option>
-        </select>
-        <select id="leads-filter-score" onchange="loadLeads()" class="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-300">
-          <option value="">כל הציונים</option>
-          <option value="7">ציון ≥ 7 (חמים)</option>
-          <option value="5">ציון ≥ 5</option>
-        </select>
-      </div>
-    </div>
-    <div class="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      <table class="w-full text-sm">
-        <thead class="bg-gray-50 border-b border-gray-100">
-          <tr>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">שם</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">נכס</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">אימייל</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">ציון</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">סטטוס</th>
-            <th class="text-right px-4 py-3 text-xs font-semibold text-gray-500">פעולה</th>
-          </tr>
-        </thead>
-        <tbody id="leads-table-body">
-          <tr><td colspan="6" class="text-center py-8 text-gray-400">טוען...</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <!-- Setup Banner -->
+  <div id="setup-banner" class="hidden mx-4 mt-3 bg-yellow-900 border border-yellow-700 rounded-xl p-3 text-sm">
+    ⚠️ Connect your Twilio & Gmail to send outreach.
+    <button onclick="showPage('settings')" class="underline font-semibold ml-1">Set up now →</button>
   </div>
 
-  <!-- INBOX TAB -->
-  <div id="tab-inbox-content" class="hidden">
-    <div class="flex gap-4 h-[calc(100vh-220px)]">
-      <!-- Conversations list -->
-      <div class="w-80 bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
-        <div class="p-4 border-b border-gray-100">
-          <p class="font-semibold text-gray-800 text-sm">שיחות</p>
-        </div>
-        <div id="conv-list" class="overflow-y-auto flex-1"></div>
-      </div>
-      <!-- Chat window -->
-      <div class="flex-1 bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
-        <div id="chat-header" class="p-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <p class="font-semibold text-gray-800 text-sm" id="chat-name">בחר שיחה</p>
-            <p class="text-xs text-gray-400" id="chat-property">—</p>
-          </div>
-          <div class="flex gap-2" id="chat-actions" style="display:none!important">
-            <button id="btn-takeover" onclick="takeoverLead()" class="text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg hover:bg-orange-200 transition">
-              השתלט על השיחה
-            </button>
-          </div>
-        </div>
-        <div id="chat-messages" class="flex-1 overflow-y-auto p-4 space-y-3">
-          <div class="text-center text-gray-400 text-sm mt-20">בחר שיחה מהרשימה</div>
-        </div>
-        <!-- Human reply input -->
-        <div id="chat-input-area" class="hidden p-4 border-t border-gray-100 flex gap-2">
-          <input id="human-reply" type="text" placeholder="כתוב תשובה..."
-            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-            onkeydown="if(event.key==='Enter') sendHumanReply()" />
-          <button onclick="sendHumanReply()" class="bg-indigo-600 text-white px-4 py-2 rounded-xl text-sm hover:bg-indigo-700 transition">
-            שלח
-          </button>
-        </div>
-      </div>
-    </div>
-  </div>
+  <!-- Pages -->
+  <div id="page-home"     class="p-4 slide-in"></div>
+  <div id="page-inbox"    class="p-4 slide-in hidden"></div>
+  <div id="page-lead"     class="p-4 slide-in hidden"></div>
+  <div id="page-outreach" class="p-4 slide-in hidden"></div>
+  <div id="page-settings" class="p-4 slide-in hidden"></div>
 
-  <!-- CAMPAIGNS TAB -->
-  <div id="tab-campaigns-content" class="hidden">
-    <div class="flex items-center justify-between mb-4">
-      <h2 class="font-semibold text-gray-800">קמפיינים</h2>
-      <button onclick="openNewCampaign()" class="bg-indigo-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-indigo-700 transition">
-        + קמפיין חדש
-      </button>
-    </div>
-
-    <!-- New Campaign Form -->
-    <div id="new-campaign-form" class="hidden bg-white rounded-2xl p-6 shadow-sm border border-gray-100 mb-4">
-      <h3 class="font-semibold text-gray-800 mb-4">קמפיין חדש</h3>
-      <div class="grid grid-cols-2 gap-4">
-        <div>
-          <label class="text-xs text-gray-500 mb-1 block">שם הקמפיין</label>
-          <input id="c-name" type="text" placeholder="לוס אנג'לס Q3"
-            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 mb-1 block">אזור יעד</label>
-          <input id="c-area" type="text" placeholder="Los Angeles"
-            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 mb-1 block">מחיר מינימום ($)</label>
-          <input id="c-min" type="number" placeholder="200000"
-            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 mb-1 block">מחיר מקסימום ($)</label>
-          <input id="c-max" type="number" placeholder="2000000"
-            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 mb-1 block">סגנון הודעה</label>
-          <select id="c-style" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            <option value="professional">מקצועי</option>
-            <option value="friendly">ידידותי</option>
-            <option value="direct">ישיר</option>
-          </select>
-        </div>
-        <div>
-          <label class="text-xs text-gray-500 mb-1 block">מגבלה יומית</label>
-          <input id="c-limit" type="number" value="250"
-            class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
-        </div>
-      </div>
-      <div class="flex gap-2 mt-4">
-        <button onclick="createCampaign()" class="bg-indigo-600 text-white text-sm px-5 py-2 rounded-xl hover:bg-indigo-700 transition">
-          צור קמפיין
-        </button>
-        <button onclick="document.getElementById('new-campaign-form').classList.add('hidden')"
-          class="text-sm text-gray-500 px-4 py-2 rounded-xl border border-gray-200 hover:bg-gray-50 transition">
-          ביטול
-        </button>
-      </div>
-    </div>
-
-    <div id="campaigns-list" class="space-y-3"></div>
-  </div>
-
-</main>
-
-<!-- Lead Detail Modal -->
-<div id="lead-modal" class="hidden fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-  <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
-    <div class="flex items-center justify-between mb-4">
-      <h3 class="font-bold text-gray-800" id="modal-name">—</h3>
-      <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-xl">✕</button>
-    </div>
-    <div id="modal-content"></div>
+  <!-- Bottom Nav -->
+  <div class="fixed bottom-0 left-0 right-0 border-t border-gray-800 flex z-20" style="background:#0f1117;">
+    <button onclick="showPage('home')"     id="nav-home"     class="flex-1 py-3 text-center text-xs font-medium">🏠<br>Home</button>
+    <button onclick="showPage('inbox')"    id="nav-inbox"    class="flex-1 py-3 text-center text-xs font-medium">💬<br>Inbox</button>
+    <button onclick="showPage('outreach')" id="nav-outreach" class="flex-1 py-3 text-center text-xs font-medium">🚀<br>Outreach</button>
+    <button onclick="showPage('settings')" id="nav-settings" class="flex-1 py-3 text-center text-xs font-medium">⚙️<br>Settings</button>
   </div>
 </div>
 
 <script>
-// ─── State ────────────────────────────────────────────────────────────────────
-let API = 'http://localhost:8000';
-let currentLeadId = null;
-let currentLeadHuman = false;
+const API = 'https://zilloagent-production.up.railway.app';
+let token = localStorage.getItem('za_token');
+let agent = null;
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => {
-  API = document.getElementById('api-url').value;
-  document.getElementById('api-url').addEventListener('change', e => { API = e.target.value; refreshAll(); });
-  checkStatus();
-  refreshAll();
-  setInterval(refreshAll, 15000);
-});
-
-async function api(path, opts = {}) {
-  const controller = new AbortController();
-  const tid = setTimeout(() => controller.abort(), 4000);
-  try {
-    const r = await fetch(API + path, {
-      headers: {'Content-Type':'application/json'},
-      signal: controller.signal,
-      ...opts
-    });
-    clearTimeout(tid);
-    if (!r.ok) throw new Error(await r.text());
-    return r.json();
-  } catch(e) {
-    clearTimeout(tid);
-    throw e;
-  }
-}
-
-async function checkStatus() {
-  try {
-    await api('/health');
-    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-green-500';
-    document.getElementById('status-text').textContent = 'מחובר';
-    document.getElementById('status-text').className = 'text-green-600';
-  } catch {
-    document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-400';
-    document.getElementById('status-text').textContent = 'לא מחובר';
-    document.getElementById('status-text').className = 'text-red-500';
-  }
-}
-
-function refreshAll() {
-  checkStatus();
-  const tab = document.querySelector('.tab-active')?.id?.replace('tab-','');
-  if (tab === 'dashboard') loadDashboard();
-  else if (tab === 'leads') loadLeads();
-  else if (tab === 'inbox') loadInbox();
-  else if (tab === 'campaigns') loadCampaigns();
-  else loadDashboard();
-}
-
-// ─── Tabs ─────────────────────────────────────────────────────────────────────
-function showTab(name) {
-  document.querySelectorAll('[id^="tab-"][id$="-content"]').forEach(el => el.classList.add('hidden'));
-  document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('tab-active'));
-  document.getElementById(`tab-${name}-content`).classList.remove('hidden');
-  document.getElementById(`tab-${name}`).classList.add('tab-active');
-  if (name === 'dashboard') loadDashboard();
-  else if (name === 'leads') loadLeads();
-  else if (name === 'inbox') loadInbox();
-  else if (name === 'campaigns') loadCampaigns();
-}
-
-// ─── Dashboard ────────────────────────────────────────────────────────────────
-async function loadDashboard() {
-  try {
-    const stats = await api('/stats/today');
-    document.getElementById('stat-sent').textContent = stats.messages_sent_today;
-    document.getElementById('stat-limit').textContent = 250 - (stats.daily_limit_remaining||0) + '/' + 250;
-    document.getElementById('stat-replies').textContent = stats.replies_today;
-    document.getElementById('stat-hot').textContent = stats.hot_leads;
-    document.getElementById('stat-handoff').textContent = stats.pending_handoffs;
-
-    const leads = await api('/leads?limit=200');
-    renderPipeline(leads.items || []);
-    renderHotLeads((leads.items || []).filter(l => l.score >= 7 && !l.human_takeover));
-  } catch(e) { console.error(e); }
-}
-
-function renderPipeline(leads) {
-  const cols = ['new','contacted','responded','qualified','handed_off'];
-  cols.forEach(s => document.getElementById(`pipe-${s}`).innerHTML = '');
-  leads.forEach(l => {
-    const col = document.getElementById(`pipe-${l.status}`);
-    if (!col) return;
-    const card = document.createElement('div');
-    card.className = 'bg-white rounded-lg p-2 text-xs shadow-sm cursor-pointer hover:ring-2 hover:ring-indigo-300 transition';
-    card.innerHTML = `
-      <p class="font-semibold text-gray-700 truncate">${l.contact_name||'—'}</p>
-      <p class="text-gray-400 truncate">${l.property?.address||'—'}</p>
-      ${l.score > 0 ? `<div class="mt-1"><span class="bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded text-xs">⭐ ${l.score.toFixed(1)}</span></div>` : ''}
-    `;
-    card.onclick = () => openLeadModal(l);
-    col.appendChild(card);
-  });
-}
-
-function renderHotLeads(leads) {
-  const section = document.getElementById('hot-leads-section');
-  const list = document.getElementById('hot-leads-list');
-  if (!leads.length) { section.classList.add('hidden'); return; }
-  section.classList.remove('hidden');
-  list.innerHTML = leads.map(l => `
-    <div class="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-center justify-between">
-      <div>
-        <p class="font-semibold text-gray-800">${l.contact_name||'—'}</p>
-        <p class="text-sm text-gray-500">${l.property?.address||'—'} · $${(l.property?.price||0).toLocaleString()}</p>
-        <p class="text-xs text-gray-400 mt-1">אימייל: ${l.contact_email||'—'}</p>
-      </div>
-      <div class="text-left flex flex-col items-end gap-2">
-        <span class="text-2xl font-bold text-orange-500">${l.score.toFixed(1)}</span>
-        <button onclick="openConversation(${l.id})" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition">
-          פתח שיחה
-        </button>
-      </div>
-    </div>
-  `).join('');
-}
-
-// ─── Leads ────────────────────────────────────────────────────────────────────
-async function loadLeads() {
-  const status = document.getElementById('leads-filter-status')?.value || '';
-  const minScore = document.getElementById('leads-filter-score')?.value || '';
-  let url = '/leads?limit=100';
-  if (status) url += `&status=${status}`;
-  if (minScore) url += `&min_score=${minScore}`;
-  try {
-    const data = await api(url);
-    const body = document.getElementById('leads-table-body');
-    if (!data.items?.length) {
-      body.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-400">אין לידים עדיין</td></tr>';
-      return;
-    }
-    body.innerHTML = data.items.map(l => `
-      <tr class="border-b border-gray-50 hover:bg-gray-50 transition cursor-pointer" onclick="openLeadModal(${JSON.stringify(l).replace(/"/g,'&quot;')})">
-        <td class="px-4 py-3">
-          <p class="font-medium text-gray-800">${l.contact_name||'—'}</p>
-          ${l.human_takeover ? '<span class="text-xs bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded">👤 אנושי</span>' : ''}
-        </td>
-        <td class="px-4 py-3 text-gray-500 text-xs max-w-48 truncate">${l.property?.address||'—'}<br><span class="text-gray-400">$${(l.property?.price||0).toLocaleString()}</span></td>
-        <td class="px-4 py-3 text-gray-500 text-xs">${l.contact_email||'—'}</td>
-        <td class="px-4 py-3">
-          ${l.score > 0 ? `<div class="flex items-center gap-1">
-            <div class="w-16 h-1.5 bg-gray-200 rounded-full overflow-hidden">
-              <div class="h-full rounded-full ${l.score>=7?'bg-orange-500':l.score>=5?'bg-yellow-400':'bg-green-400'}" style="width:${l.score*10}%"></div>
-            </div>
-            <span class="text-xs font-semibold ${l.score>=7?'text-orange-600':'text-gray-600'}">${l.score.toFixed(1)}</span>
-          </div>` : '<span class="text-gray-300 text-xs">—</span>'}
-        </td>
-        <td class="px-4 py-3"><span class="status-${l.status} text-xs px-2 py-1 rounded-full font-medium">${statusLabel(l.status)}</span></td>
-        <td class="px-4 py-3">
-          <button onclick="event.stopPropagation(); openConversation(${l.id})" class="text-xs text-indigo-600 hover:underline">שיחה</button>
-        </td>
-      </tr>
-    `).join('');
-  } catch(e) { console.error(e); }
-}
-
-function statusLabel(s) {
-  return {new:'חדש',contacted:'נשלח',responded:'ענה',qualified:'מוסמך',handed_off:'הועבר',opted_out:'הסיר'}[s]||s;
-}
-
-// ─── Inbox / Conversations ────────────────────────────────────────────────────
-async function loadInbox() {
-  try {
-    const data = await api('/leads?limit=100');
-    const list = document.getElementById('conv-list');
-    const active = (data.items||[]).filter(l => l.status !== 'new' && l.status !== 'opted_out');
-    if (!active.length) {
-      list.innerHTML = '<div class="p-4 text-sm text-gray-400 text-center">אין שיחות עדיין</div>';
-      return;
-    }
-    list.innerHTML = active.map(l => `
-      <div onclick="openConversation(${l.id})" class="p-3 border-b border-gray-50 hover:bg-gray-50 cursor-pointer transition ${currentLeadId===l.id?'bg-indigo-50':''}" id="conv-item-${l.id}">
-        <div class="flex items-center justify-between">
-          <p class="text-sm font-medium text-gray-800 truncate">${l.contact_name||'—'}</p>
-          ${l.score > 0 ? `<span class="text-xs font-bold ${l.score>=7?'text-orange-500':'text-gray-400'}">${l.score.toFixed(1)}</span>` : ''}
-        </div>
-        <p class="text-xs text-gray-400 truncate">${l.property?.address||'—'}</p>
-        <div class="flex items-center gap-1 mt-1">
-          <span class="status-${l.status} text-xs px-1.5 py-0.5 rounded-full">${statusLabel(l.status)}</span>
-          ${l.human_takeover ? '<span class="text-xs text-orange-600">👤</span>' : ''}
-        </div>
-      </div>
-    `).join('');
-  } catch(e) { console.error(e); }
-}
-
-async function openConversation(leadId) {
-  showTab('inbox');
-  currentLeadId = leadId;
-  try {
-    const data = await api(`/leads/${leadId}/conversation`);
-    const lead = await api(`/leads/${leadId}`);
-    currentLeadHuman = data.human_takeover;
-
-    document.getElementById('chat-name').textContent = lead.contact_name || '—';
-    document.getElementById('chat-property').textContent = (lead.property?.address||'—') + ' · $' + (lead.property?.price||0).toLocaleString();
-
-    const actionsEl = document.getElementById('chat-actions');
-    actionsEl.style.display = 'flex';
-    const btnTakeover = document.getElementById('btn-takeover');
-    if (data.human_takeover) {
-      btnTakeover.textContent = '✅ שיחה בניהול אנושי';
-      btnTakeover.className = 'text-xs bg-green-100 text-green-700 px-3 py-1.5 rounded-lg';
-      btnTakeover.onclick = null;
-      document.getElementById('chat-input-area').classList.remove('hidden');
-    } else {
-      btnTakeover.textContent = '👤 השתלט על השיחה';
-      btnTakeover.className = 'text-xs bg-orange-100 text-orange-700 px-3 py-1.5 rounded-lg hover:bg-orange-200 transition';
-      btnTakeover.onclick = () => takeoverLead();
-      document.getElementById('chat-input-area').classList.add('hidden');
-    }
-
-    const msgs = document.getElementById('chat-messages');
-    if (!data.messages?.length) {
-      msgs.innerHTML = '<div class="text-center text-gray-400 text-sm mt-10">אין הודעות עדיין</div>';
-      return;
-    }
-    msgs.innerHTML = data.messages.map(m => `
-      <div class="flex ${m.role==='assistant'?'justify-end':'justify-start'}">
-        <div class="${m.role==='assistant'?'msg-out':'msg-in'} max-w-xs px-4 py-2.5 text-sm">
-          ${m.content.startsWith('[HUMAN]') ? '<span class="text-xs opacity-70">👤 סוכן: </span>' : ''}
-          ${m.content.replace('[HUMAN] ','')}
-          <p class="text-xs opacity-50 mt-1">${new Date(m.timestamp).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'})}</p>
-        </div>
-      </div>
-    `).join('');
-    msgs.scrollTop = msgs.scrollHeight;
-
-    // highlight in list
-    document.querySelectorAll('[id^="conv-item-"]').forEach(el => el.classList.remove('bg-indigo-50'));
-    const item = document.getElementById(`conv-item-${leadId}`);
-    if (item) item.classList.add('bg-indigo-50');
-  } catch(e) { console.error(e); }
-}
-
-async function takeoverLead() {
-  if (!currentLeadId) return;
-  try {
-    await api(`/leads/${currentLeadId}/takeover`, {
-      method: 'POST',
-      body: JSON.stringify({ agent_name: 'Human Agent' })
-    });
-    openConversation(currentLeadId);
-  } catch(e) { alert('שגיאה: ' + e.message); }
-}
-
-async function sendHumanReply() {
-  const input = document.getElementById('human-reply');
-  const content = input.value.trim();
-  if (!content || !currentLeadId) return;
-  input.value = '';
-  try {
-    await api(`/leads/${currentLeadId}/message`, {
-      method: 'POST',
-      body: JSON.stringify({ content, channel: 'email' })
-    });
-    openConversation(currentLeadId);
-  } catch(e) { alert('שגיאה: ' + e.message); }
-}
-
-// ─── Campaigns ────────────────────────────────────────────────────────────────
-async function loadCampaigns() {
-  try {
-    const data = await api('/campaigns');
-    const list = document.getElementById('campaigns-list');
-    if (!data.length) {
-      list.innerHTML = '<div class="bg-white rounded-2xl p-8 text-center text-gray-400 shadow-sm border border-gray-100">אין קמפיינים עדיין. צור קמפיין חדש.</div>';
-      return;
-    }
-    list.innerHTML = data.map(c => `
-      <div class="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <div class="flex items-center gap-2 mb-1">
-            <p class="font-semibold text-gray-800">${c.name}</p>
-            <span class="text-xs px-2 py-0.5 rounded-full ${c.is_active?'bg-green-100 text-green-700':'bg-gray-100 text-gray-500'}">${c.is_active?'פעיל':'מושהה'}</span>
-          </div>
-          <p class="text-sm text-gray-500">📍 ${c.target_area||'—'} · ${c.min_price?'$'+c.min_price.toLocaleString():''} – ${c.max_price?'$'+c.max_price.toLocaleString():''}</p>
-          <p class="text-xs text-gray-400 mt-1">מגבלה: ${c.daily_limit}/יום · סגנון: ${c.message_style}</p>
-        </div>
-        <div class="flex gap-2">
-          <button onclick="toggleCampaign(${c.id}, ${!c.is_active})" class="text-xs border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition text-gray-600">
-            ${c.is_active?'השהה':'הפעל'}
-          </button>
-          <button onclick="runCampaign(${c.id})" class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition">
-            ▶ הרץ עכשיו
-          </button>
-        </div>
-      </div>
-    `).join('');
-  } catch(e) { console.error(e); }
-}
-
-function openNewCampaign() {
-  document.getElementById('new-campaign-form').classList.toggle('hidden');
-}
-
-async function createCampaign() {
-  const payload = {
-    name: document.getElementById('c-name').value,
-    target_area: document.getElementById('c-area').value,
-    min_price: parseFloat(document.getElementById('c-min').value)||null,
-    max_price: parseFloat(document.getElementById('c-max').value)||null,
-    message_style: document.getElementById('c-style').value,
-    daily_limit: parseInt(document.getElementById('c-limit').value)||250,
+// ── API ───────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: {'Content-Type': 'application/json', ...(token ? {Authorization: `Bearer ${token}`} : {})},
   };
-  if (!payload.name) { alert('חסר שם קמפיין'); return; }
-  try {
-    await api('/campaigns', { method:'POST', body: JSON.stringify(payload) });
-    document.getElementById('new-campaign-form').classList.add('hidden');
-    loadCampaigns();
-  } catch(e) { alert('שגיאה: '+e.message); }
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail || JSON.stringify(data));
+  return data;
 }
 
-async function toggleCampaign(id, active) {
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function showLogin()  { document.getElementById('signup-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); }
+function showSignup() { document.getElementById('login-form').classList.add('hidden');  document.getElementById('signup-form').classList.remove('hidden'); }
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const err   = document.getElementById('login-error');
+  err.classList.add('hidden');
+  if (!email||!pass) { err.textContent='Enter email and password'; err.classList.remove('hidden'); return; }
   try {
-    await api(`/campaigns/${id}`, { method:'PATCH', body: JSON.stringify({is_active: active}) });
-    loadCampaigns();
-  } catch(e) { alert('שגיאה: '+e.message); }
+    const d = await api('POST','/auth/login',{email,password:pass});
+    token = d.token; agent = d.agent;
+    localStorage.setItem('za_token', token);
+    enterApp();
+  } catch(e) { err.textContent=e.message; err.classList.remove('hidden'); }
 }
 
-async function runCampaign(id) {
+async function doSignup() {
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass  = document.getElementById('signup-password').value;
+  const err   = document.getElementById('signup-error');
+  err.classList.add('hidden');
+  if (!name||!email||!pass) { err.textContent='Fill in all fields'; err.classList.remove('hidden'); return; }
+  if (pass.length<6) { err.textContent='Password must be at least 6 characters'; err.classList.remove('hidden'); return; }
   try {
-    await api(`/campaigns/${id}/run`, { method:'POST' });
-    alert('הקמפיין הועבר לתור — ישלח בקרוב!');
-  } catch(e) { alert('שגיאה: '+e.message); }
+    const d = await api('POST','/auth/signup',{name,email,password:pass});
+    token = d.token; agent = d.agent;
+    localStorage.setItem('za_token', token);
+    enterApp();
+  } catch(e) { err.textContent=e.message; err.classList.remove('hidden'); }
 }
 
-// ─── Lead Modal ───────────────────────────────────────────────────────────────
-function openLeadModal(lead) {
-  if (typeof lead === 'string') lead = JSON.parse(lead.replace(/&quot;/g,'"'));
-  document.getElementById('modal-name').textContent = lead.contact_name || '—';
-  document.getElementById('modal-content').innerHTML = `
-    <div class="space-y-3 text-sm">
-      <div class="grid grid-cols-2 gap-3">
-        <div class="bg-gray-50 rounded-xl p-3">
-          <p class="text-xs text-gray-400">אימייל</p>
-          <p class="font-medium">${lead.contact_email||'—'}</p>
-        </div>
-        <div class="bg-gray-50 rounded-xl p-3">
-          <p class="text-xs text-gray-400">סטטוס</p>
-          <span class="status-${lead.status} text-xs px-2 py-1 rounded-full font-medium">${statusLabel(lead.status)}</span>
-        </div>
-        <div class="bg-gray-50 rounded-xl p-3">
-          <p class="text-xs text-gray-400">ציון</p>
-          <p class="font-bold text-xl ${lead.score>=7?'text-orange-500':''}">${lead.score?.toFixed(1)||'0'}</p>
-        </div>
-        <div class="bg-gray-50 rounded-xl p-3">
-          <p class="text-xs text-gray-400">נכס</p>
-          <p class="font-medium text-xs">${lead.property?.address||'—'}</p>
-          <p class="text-gray-400 text-xs">$${(lead.property?.price||0).toLocaleString()}</p>
+function doLogout() {
+  localStorage.removeItem('za_token'); token=null; agent=null;
+  document.getElementById('app-screen').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+  showLogin();
+}
+
+async function enterApp() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.remove('hidden');
+  if (!agent) {
+    try { agent = await api('GET','/auth/me'); } catch(e) { doLogout(); return; }
+  }
+  document.getElementById('agent-name-badge').textContent = agent.name || '';
+  if (!agent.has_twilio || !agent.has_gmail) document.getElementById('setup-banner').classList.remove('hidden');
+  else document.getElementById('setup-banner').classList.add('hidden');
+  showPage('home');
+}
+
+if (token) {
+  api('GET','/auth/me').then(a=>{agent=a; enterApp();}).catch(()=>{localStorage.removeItem('za_token'); token=null;});
+}
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+const NAV_PAGES = ['home','inbox','outreach','settings','lead'];
+
+function showPage(name) {
+  NAV_PAGES.forEach(p => {
+    document.getElementById(`page-${p}`).classList.add('hidden');
+  });
+  ['home','inbox','outreach','settings'].forEach(p => {
+    const nav = document.getElementById(`nav-${p}`);
+    if (nav) nav.className = 'flex-1 py-3 text-center text-xs font-medium text-gray-500';
+  });
+  document.getElementById(`page-${name}`).classList.remove('hidden');
+  const nav = document.getElementById(`nav-${name}`);
+  if (nav) nav.className = 'flex-1 py-3 text-center text-xs font-medium text-indigo-400';
+  if (name==='home')     renderHome();
+  if (name==='inbox')    renderInbox();
+  if (name==='outreach') renderOutreach();
+  if (name==='settings') renderSettings();
+}
+
+// ── HOME ──────────────────────────────────────────────────────────────────────
+async function renderHome() {
+  const el = document.getElementById('page-home');
+  el.innerHTML = '<p class="text-center text-gray-500 text-sm py-10">Loading...</p>';
+  try {
+    const s = await api('GET','/stats/today');
+    el.innerHTML = `
+      <h2 class="text-lg font-bold mb-4">Dashboard</h2>
+      <div class="grid grid-cols-2 gap-3 mb-5">
+        ${sCard('Messages Today', s.messages_sent_today ?? 0, 'text-blue-400')}
+        ${sCard('Hot Leads 🔥',   s.hot_leads ?? 0,          'text-orange-400')}
+        ${sCard('Response Rate',  (s.response_rate ?? 0)+'%','text-green-400')}
+        ${sCard('Total Leads',    s.total_leads ?? 0,         'text-purple-400')}
+      </div>
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-3">Consent Pipeline</p>
+        <div class="flex gap-2">
+          <div class="flex-1 bg-yellow-950 border border-yellow-800 rounded-xl p-3 text-center">
+            <p class="text-3xl font-bold text-yellow-300">${s.pending ?? 0}</p>
+            <p class="text-xs text-yellow-600 mt-1">⏳ Pending</p>
+          </div>
+          <div class="flex-1 bg-green-950 border border-green-800 rounded-xl p-3 text-center">
+            <p class="text-3xl font-bold text-green-300">${s.consented ?? 0}</p>
+            <p class="text-xs text-green-600 mt-1">✅ Consented</p>
+          </div>
+          <div class="flex-1 bg-red-950 border border-red-800 rounded-xl p-3 text-center">
+            <p class="text-3xl font-bold text-red-300">${s.opted_out ?? 0}</p>
+            <p class="text-xs text-red-600 mt-1">🚫 Opted Out</p>
+          </div>
         </div>
       </div>
-      ${lead.timeline ? `<div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-gray-400">ציר זמן</p><p>${lead.timeline}</p></div>` : ''}
-      ${lead.notes ? `<div class="bg-gray-50 rounded-xl p-3"><p class="text-xs text-gray-400">הערות</p><p>${lead.notes}</p></div>` : ''}
-      <div class="flex gap-2 mt-2">
-        <button onclick="closeModal(); openConversation(${lead.id})" class="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm hover:bg-indigo-700 transition">
-          פתח שיחה
-        </button>
-        ${!lead.human_takeover ? `<button onclick="closeModal(); currentLeadId=${lead.id}; takeoverLead()" class="flex-1 bg-orange-100 text-orange-700 py-2 rounded-xl text-sm hover:bg-orange-200 transition">השתלט</button>` : ''}
+      <button onclick="showPage('outreach')" class="btn btn-primary w-full mb-3">🚀 Start New Outreach</button>
+      <button onclick="showPage('inbox')"    class="btn btn-secondary w-full">💬 View Inbox →</button>
+    `;
+  } catch(e) {
+    el.innerHTML = `<p class="text-red-400 text-sm text-center py-10">${e.message}</p>`;
+  }
+}
+
+function sCard(label, val, cls) {
+  return `<div class="card p-4"><p class="text-xs text-gray-500 mb-1">${label}</p><p class="text-3xl font-bold ${cls}">${val}</p></div>`;
+}
+
+// ── INBOX ─────────────────────────────────────────────────────────────────────
+let inboxFilter = 'all';
+
+async function renderInbox() {
+  const el = document.getElementById('page-inbox');
+  el.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-bold">Inbox</h2>
+    </div>
+    <div class="flex gap-1 mb-4 overflow-x-auto pb-1">
+      ${['all','pending','consented','opted_out'].map(f =>
+        `<button onclick="setFilter('${f}')"
+          class="flex-none px-3 py-1.5 rounded-lg text-xs font-medium ${inboxFilter===f ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}">${f.replace('_',' ')}</button>`
+      ).join('')}
+    </div>
+    <div id="leads-list"><p class="text-center text-gray-500 text-sm py-10">Loading...</p></div>
+  `;
+  await loadLeads();
+}
+
+function setFilter(f) { inboxFilter=f; renderInbox(); }
+
+async function loadLeads() {
+  const el = document.getElementById('leads-list');
+  if (!el) return;
+  try {
+    const path = inboxFilter==='all' ? '/leads' : `/leads?consent_status=${inboxFilter}`;
+    const leads = await api('GET', path);
+    if (!leads.length) { el.innerHTML='<p class="text-center text-gray-500 text-sm py-10">No leads yet</p>'; return; }
+    el.innerHTML = leads.map(l => `
+      <div onclick="openLead(${l.id})" class="card p-4 mb-3 cursor-pointer active:border-indigo-500 transition">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm truncate">${l.contact_name||'Unknown'}</p>
+            <p class="text-xs text-gray-500 truncate mt-0.5">${l.contact_phone||l.contact_email||'—'}</p>
+          </div>
+          <div class="flex flex-col items-end gap-1 shrink-0">
+            ${cBadge(l.consent_status)}
+            ${(l.score||0)>=7 ? '<span class="text-xs text-orange-400">🔥 Hot</span>' : ''}
+          </div>
+        </div>
+        ${l.human_takeover ? '<p class="text-xs text-yellow-400 mt-2">👤 Human takeover</p>' : ''}
+      </div>
+    `).join('');
+  } catch(e) { el.innerHTML=`<p class="text-red-400 text-sm text-center py-10">${e.message}</p>`; }
+}
+
+function cBadge(s) {
+  if (s==='consented') return '<span class="badge-consented text-xs px-2 py-0.5 rounded-full font-medium">✅ Consented</span>';
+  if (s==='opted_out') return '<span class="badge-optedout text-xs px-2 py-0.5 rounded-full font-medium">🚫 Opted Out</span>';
+  return '<span class="badge-pending text-xs px-2 py-0.5 rounded-full font-medium">⏳ Pending</span>';
+}
+
+// ── LEAD DETAIL ───────────────────────────────────────────────────────────────
+async function openLead(id) {
+  showPage('lead');
+  const el = document.getElementById('page-lead');
+  el.innerHTML = '<p class="text-center text-gray-500 text-sm py-10">Loading...</p>';
+  try {
+    const l = await api('GET', `/leads/${id}`);
+    const msgs = (l.messages||[]);
+    el.innerHTML = `
+      <div class="flex items-center gap-3 mb-4">
+        <button onclick="showPage('inbox')" class="text-gray-400 hover:text-white text-xl leading-none">←</button>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold truncate">${l.contact_name||'Unknown'}</p>
+          <p class="text-xs text-gray-500 truncate">${[l.contact_phone,l.contact_email].filter(Boolean).join(' · ')}</p>
+        </div>
+        ${cBadge(l.consent_status)}
+      </div>
+
+      ${l.call_recording ? `
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-2">🎧 Call Recording</p>
+        <audio controls class="w-full" src="${l.call_recording}"></audio>
+      </div>` : ''}
+
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-3">Messages</p>
+        <div class="space-y-2 max-h-64 overflow-y-auto">
+          ${msgs.length ? msgs.map(m => `
+            <div class="flex ${m.direction==='outbound'?'justify-end':'justify-start'}">
+              <div class="max-w-xs px-3 py-2 rounded-2xl text-xs ${m.direction==='outbound'?'bg-indigo-600 text-white':'bg-gray-700 text-gray-200'}">
+                <p>${m.content||''}</p>
+                <p class="opacity-50 mt-1 text-right">${(m.created_at||'').slice(11,16)} · ${m.type||''}</p>
+              </div>
+            </div>
+          `).join('') : '<p class="text-gray-500 text-xs text-center py-4">No messages yet</p>'}
+        </div>
+      </div>
+
+      ${!l.human_takeover ? `
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-3">Send Message</p>
+        <textarea id="manual-msg" class="input h-20 mb-3" placeholder="Type your message..."></textarea>
+        <div class="flex gap-2">
+          <button onclick="sendMsg(${l.id},'sms')"   class="btn btn-primary  flex-1 text-xs py-2">📱 SMS</button>
+          <button onclick="sendMsg(${l.id},'email')" class="btn btn-secondary flex-1 text-xs py-2">📧 Email</button>
+          <button onclick="takeover(${l.id})"        class="btn btn-secondary text-xs py-2 px-3">👤</button>
+        </div>
+      </div>` : `
+      <div class="bg-yellow-950 border border-yellow-800 p-3 rounded-xl text-sm mb-4">
+        👤 Human takeover — AI is paused for this lead
+        <button onclick="resumeAI(${l.id})" class="underline ml-2 text-xs">Resume AI</button>
+      </div>`}
+
+      <div class="card p-4 text-xs text-gray-500 space-y-1">
+        <p>Score: <span class="text-white font-medium">${l.score||0}/10</span> ${(l.score||0)>=7?'🔥':''}</p>
+        <p>Status: <span class="text-white">${l.status||'—'}</span></p>
+        <p>Consent: <span class="text-white">${l.consent_status||'—'}</span>${l.consent_timestamp?' · '+l.consent_timestamp.slice(0,16):''}</p>
+        <p>Follow-up sent: <span class="text-white">${l.followup_sent?'Yes':'No'}</span></p>
+        ${l.call_id ? `<p>Call ID: <span class="text-white font-mono">${l.call_id}</span></p>` : ''}
+      </div>
+    `;
+  } catch(e) { el.innerHTML=`<p class="text-red-400 text-sm text-center py-10">${e.message}</p>`; }
+}
+
+async function sendMsg(id, type) {
+  const msg = document.getElementById('manual-msg')?.value.trim();
+  if (!msg) return;
+  try {
+    await api('POST',`/leads/${id}/message`,{message:msg,message_type:type});
+    document.getElementById('manual-msg').value='';
+    openLead(id);
+  } catch(e) { alert('Error: '+e.message); }
+}
+
+async function takeover(id) {
+  try { await api('POST',`/leads/${id}/takeover`); openLead(id); }
+  catch(e) { alert(e.message); }
+}
+
+async function resumeAI(id) {
+  try { await api('DELETE',`/leads/${id}/takeover`); openLead(id); }
+  catch(e) { alert(e.message); }
+}
+
+// ── OUTREACH ─────────────────────────────────────────────────────────────────
+function renderOutreach() {
+  document.getElementById('page-outreach').innerHTML = `
+    <h2 class="text-lg font-bold mb-4">🚀 Outreach</h2>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-1">Start Consent-SMS Campaign</p>
+      <p class="text-xs text-gray-500 mb-4">Sends "Reply YES for a call, STOP to opt out" from YOUR Twilio number. System then auto-calls anyone who says YES (9 AM–9 PM their time).</p>
+      <label class="text-xs text-gray-400 block mb-1">Target city</label>
+      <input id="o-city"  class="input mb-3" placeholder="e.g. Los Angeles, CA"/>
+      <label class="text-xs text-gray-400 block mb-1">Max contacts</label>
+      <input id="o-limit" class="input mb-4" type="number" value="15" min="1" max="250"/>
+      <button onclick="startOutreach()" class="btn btn-primary w-full">Send Campaign</button>
+      <div id="o-result" class="mt-3 text-sm hidden rounded-xl p-3"></div>
+    </div>
+
+    <div class="card p-4">
+      <p class="text-sm font-semibold mb-3">How it works</p>
+      <div class="space-y-3 text-xs text-gray-400">
+        <div class="flex gap-3"><span class="text-base">1️⃣</span><span>SMS from YOUR number: <em>"Hi [name], I have buyers looking in [city]. Reply YES for a call, STOP to opt out."</em></span></div>
+        <div class="flex gap-3"><span class="text-base">2️⃣</span><span>They reply <strong class="text-green-400">YES</strong> → consent logged → AI call placed automatically</span></div>
+        <div class="flex gap-3"><span class="text-base">3️⃣</span><span>They reply <strong class="text-red-400">STOP</strong> → added to DNC list, never contacted again</span></div>
+        <div class="flex gap-3"><span class="text-base">4️⃣</span><span>No reply → one follow-up SMS after 3 days, then silence</span></div>
+        <div class="flex gap-3"><span class="text-base">5️⃣</span><span>Hot leads (score 7+) → you get an email alert instantly</span></div>
       </div>
     </div>
   `;
-  document.getElementById('lead-modal').classList.remove('hidden');
 }
 
-function closeModal() {
-  document.getElementById('lead-modal').classList.add('hidden');
+async function startOutreach() {
+  const city  = document.getElementById('o-city').value.trim();
+  const limit = parseInt(document.getElementById('o-limit').value)||15;
+  const res   = document.getElementById('o-result');
+  if (!city) { res.textContent='Enter a target city'; res.className='mt-3 text-sm rounded-xl p-3 bg-red-950 text-red-400'; res.classList.remove('hidden'); return; }
+  try {
+    await api('POST','/outreach/run',{target_area:city,limit});
+    res.textContent = `✅ Campaign started — ${limit} contacts queued for ${city}. SMS will go out from your number shortly.`;
+    res.className = 'mt-3 text-sm rounded-xl p-3 bg-green-950 text-green-300';
+    res.classList.remove('hidden');
+  } catch(e) {
+    res.textContent = '❌ '+e.message;
+    res.className = 'mt-3 text-sm rounded-xl p-3 bg-red-950 text-red-400';
+    res.classList.remove('hidden');
+  }
 }
 
-document.getElementById('lead-modal').addEventListener('click', e => {
-  if (e.target === document.getElementById('lead-modal')) closeModal();
-});
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
+function renderSettings() {
+  const el = document.getElementById('page-settings');
+  el.innerHTML = `
+    <h2 class="text-lg font-bold mb-4">⚙️ Settings</h2>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-1">Account</p>
+      <p class="text-xs text-gray-400">${agent?.name||''}</p>
+      <p class="text-xs text-gray-500">${agent?.email||''}</p>
+    </div>
+
+    <!-- Twilio -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-semibold">📱 Twilio</p>
+        <span class="text-xs ${agent?.has_twilio?'text-green-400':'text-yellow-400'}">${agent?.has_twilio?'✅ Connected':'⚠️ Not set'}</span>
+      </div>
+      <div class="space-y-2 mb-3">
+        <input id="t-sid"   class="input text-xs" placeholder="Account SID — ACxxxx..." value="${agent?.twilio_sid||''}"/>
+        <input id="t-token" class="input text-xs" type="password" placeholder="Auth Token"/>
+        <input id="t-phone" class="input text-xs" placeholder="Phone number +1XXXXXXXXXX" value="${agent?.twilio_phone||''}"/>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-3 text-xs text-gray-400 mb-3 space-y-1">
+        <p class="font-semibold text-gray-300">Get Twilio credentials:</p>
+        <p>1. <a href="https://console.twilio.com" target="_blank" class="text-indigo-400 underline">console.twilio.com</a> → copy SID & Auth Token</p>
+        <p>2. Buy a phone number under Phone Numbers → Manage</p>
+        <p>3. Set Messaging webhook: <code class="bg-gray-700 px-1 rounded break-all">${API}/webhooks/twilio/sms</code></p>
+      </div>
+      <button onclick="saveTwilio()" class="btn btn-primary w-full text-xs py-2">Save Twilio</button>
+    </div>
+
+    <!-- Gmail -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-semibold">📧 Gmail</p>
+        <span class="text-xs ${agent?.has_gmail?'text-green-400':'text-yellow-400'}">${agent?.has_gmail?'✅ Connected':'⚠️ Not set'}</span>
+      </div>
+      <div class="space-y-2 mb-3">
+        <input id="g-user" class="input text-xs" type="email" placeholder="your@gmail.com" value="${agent?.gmail_user||''}"/>
+        <input id="g-pass" class="input text-xs" type="password" placeholder="Gmail App Password (16 chars)"/>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-3 text-xs text-gray-400 mb-3 space-y-1">
+        <p class="font-semibold text-gray-300">Create a Gmail App Password:</p>
+        <p>1. Google Account → Security → enable 2-Step Verification</p>
+        <p>2. Search "App passwords" → create one called "ZilloAgent"</p>
+        <p>3. Paste the 16-character code here</p>
+      </div>
+      <button onclick="saveGmail()" class="btn btn-primary w-full text-xs py-2">Save Gmail</button>
+    </div>
+
+    <!-- Bland.ai -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-semibold">📞 Bland.ai (AI voice calls)</p>
+        <span class="text-xs ${agent?.has_bland?'text-green-400':'text-gray-500'}">${agent?.has_bland?'✅ Own key':'○ Uses shared key'}</span>
+      </div>
+      <input id="b-key" class="input text-xs mb-3" type="password" placeholder="Your Bland.ai API key (optional)"/>
+      <button onclick="saveBland()" class="btn btn-secondary w-full text-xs py-2">Save Bland.ai key</button>
+    </div>
+
+    <!-- Test -->
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">🧪 Test Connections</p>
+      <button onclick="testCreds()" class="btn btn-secondary w-full text-xs py-2">Test Twilio + Gmail</button>
+      <div id="test-result" class="mt-3 text-xs space-y-1 hidden"></div>
+    </div>
+
+    <!-- Webhook reference -->
+    <div class="card p-4">
+      <p class="text-sm font-semibold mb-2">🔗 Twilio Webhook URL</p>
+      <p class="text-xs text-gray-500 mb-2">Set this in Twilio console under your phone number's Messaging webhook (HTTP POST):</p>
+      <div class="bg-gray-800 rounded-lg px-3 py-2 text-xs font-mono text-indigo-300 break-all">${API}/webhooks/twilio/sms</div>
+    </div>
+  `;
+}
+
+async function saveTwilio() {
+  const sid   = document.getElementById('t-sid').value.trim();
+  const tok   = document.getElementById('t-token').value.trim();
+  const phone = document.getElementById('t-phone').value.trim();
+  if (!sid||!phone) { alert('Enter SID and phone number'); return; }
+  const body = {twilio_sid:sid, twilio_phone:phone};
+  if (tok) body.twilio_token = tok;
+  try { const d = await api('PUT','/auth/credentials',body); agent=d.agent; alert('✅ Twilio saved!'); renderSettings(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+async function saveGmail() {
+  const user = document.getElementById('g-user').value.trim();
+  const pass = document.getElementById('g-pass').value.trim();
+  if (!user) { alert('Enter your Gmail address'); return; }
+  const body = {gmail_user:user};
+  if (pass) body.gmail_password = pass;
+  try { const d = await api('PUT','/auth/credentials',body); agent=d.agent; alert('✅ Gmail saved!'); renderSettings(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+async function saveBland() {
+  const key = document.getElementById('b-key').value.trim();
+  if (!key) { alert('Enter your Bland.ai key'); return; }
+  try { const d = await api('PUT','/auth/credentials',{bland_key:key}); agent=d.agent; alert('✅ Bland.ai key saved!'); renderSettings(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+async function testCreds() {
+  const el = document.getElementById('test-result');
+  el.innerHTML='<p class="text-gray-400">Testing...</p>'; el.classList.remove('hidden');
+  try {
+    const r = await api('POST','/auth/test-credentials');
+    el.innerHTML = Object.entries(r).map(([k,v])=>`<p>${k}: <span class="${String(v).includes('✅')?'text-green-400':'text-red-400'}">${v}</span></p>`).join('');
+  } catch(e) { el.innerHTML=`<p class="text-red-400">${e.message}</p>`; }
+}
+
+// Auto-refresh home stats every 30s
+setInterval(() => {
+  if (token && !document.getElementById('page-home').classList.contains('hidden')) renderHome();
+}, 30000);
 </script>
 </body>
 </html>
