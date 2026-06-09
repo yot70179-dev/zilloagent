@@ -11,7 +11,7 @@ import pytz
 from fastapi import Depends, FastAPI, Form, HTTPException, Query, Request, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from auth import create_token, get_current_agent, hash_password, verify_password
