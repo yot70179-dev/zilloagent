@@ -400,3 +400,10 @@ def _serialize_property(p: Property) -> Dict[str, Any]:
         "listing_agent_email": p.listing_agent_email,
         "listing_agent_phone": p.listing_agent_phone,
     }
+
+
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
+    }
