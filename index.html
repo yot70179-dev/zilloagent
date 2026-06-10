@@ -3,156 +3,245 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
-<title>ZilloAgent — AI Real Estate Outreach</title>
-<script src="https://cdn.tailwindcss.com"></script>
+<title>ZilloAgent</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  body{font-family:system-ui,-apple-system,sans-serif;background:#0f1117;color:#e2e8f0;}
-  .card{background:#1a1d27;border:1px solid #2d3148;border-radius:16px;}
-  .input{background:#1a1d27;border:1px solid #3d4168;border-radius:10px;padding:10px 14px;color:#e2e8f0;width:100%;outline:none;font-size:14px;}
-  .input:focus{border-color:#6366f1;}
-  .input::placeholder{color:#4b5563;}
-  .btn{padding:10px 20px;border-radius:10px;font-weight:600;cursor:pointer;transition:all .15s;font-size:14px;border:none;}
-  .btn-primary{background:#6366f1;color:#fff;}
-  .btn-primary:hover{background:#4f52e0;}
-  .btn-primary:active{background:#4345cc;}
-  .btn-secondary{background:#1a1d27;border:1px solid #3d4168;color:#e2e8f0;}
-  .btn-secondary:hover{border-color:#6366f1;}
-  .badge-pending  {background:#422006;color:#fb923c;}
-  .badge-consented{background:#052e16;color:#4ade80;}
-  .badge-optedout {background:#450a0a;color:#f87171;}
-  .slide-in{animation:slideIn .18s ease-out;}
-  @keyframes slideIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
-  ::-webkit-scrollbar{width:4px;}
-  ::-webkit-scrollbar-track{background:#1a1d27;}
-  ::-webkit-scrollbar-thumb{background:#4b5563;border-radius:2px;}
-  textarea.input{resize:none;}
-  label.field-label{display:block;font-size:11px;color:#9ca3af;margin-bottom:4px;font-weight:500;letter-spacing:.03em;}
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#0c0e14;
+  --surface:#13161f;
+  --surface2:#1a1e2b;
+  --border:#252836;
+  --border2:#2e3347;
+  --text:#e8eaf0;
+  --text2:#8b90a0;
+  --text3:#555c72;
+  --indigo:#5b6cf9;
+  --indigo-dim:#1e2250;
+  --indigo-hover:#4a5ae8;
+  --green:#22c55e;
+  --green-dim:#0a2e1a;
+  --orange:#f59e0b;
+  --orange-dim:#2a1e08;
+  --red:#ef4444;
+  --red-dim:#2a0e0e;
+  --radius:12px;
+  --radius-sm:8px;
+  --radius-lg:16px;
+}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;}
+
+/* ── Inputs ── */
+.input{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 13px;color:var(--text);width:100%;outline:none;font-size:14px;font-family:inherit;transition:border-color .15s;}
+.input:focus{border-color:var(--indigo);background:#1d2035;}
+.input::placeholder{color:var(--text3);}
+.input:read-only{opacity:.5;cursor:default;}
+textarea.input{resize:none;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px;letter-spacing:.02em;}
+.field .hint{font-size:11px;color:var(--text3);margin-top:4px;}
+
+/* ── Buttons ── */
+.btn{padding:10px 18px;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;font-size:14px;font-family:inherit;border:none;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
+.btn-primary{background:var(--indigo);color:#fff;}
+.btn-primary:hover{background:var(--indigo-hover);transform:translateY(-1px);box-shadow:0 4px 20px rgba(91,108,249,.35);}
+.btn-primary:active{transform:none;box-shadow:none;}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
+.btn-ghost:hover{border-color:var(--indigo);color:var(--text);}
+.btn-danger{background:transparent;color:var(--red);border:1px solid var(--red-dim);}
+.btn-danger:hover{background:var(--red-dim);}
+.btn-sm{padding:6px 12px;font-size:12px;border-radius:6px;}
+.btn-full{width:100%;}
+
+/* ── Cards ── */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:20px;}
+.card-sm{padding:14px 16px;}
+
+/* ── Badges ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-pending  {background:var(--orange-dim);color:var(--orange);}
+.badge-consented{background:var(--green-dim);color:var(--green);}
+.badge-optedout {background:var(--red-dim);color:var(--red);}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:3px;height:3px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+
+/* ── Divider ── */
+.divider{border:none;border-top:1px solid var(--border);margin:20px 0;}
+
+/* ── Usage bar ── */
+.usage-track{height:4px;background:var(--border);border-radius:2px;overflow:hidden;margin-top:6px;}
+.usage-fill{height:100%;border-radius:2px;transition:width .4s ease;}
+
+/* ── Message bubbles ── */
+.bubble-out{background:var(--indigo);color:#fff;border-radius:16px 4px 16px 16px;}
+.bubble-in {background:var(--surface2);color:var(--text);border-radius:4px 16px 16px 16px;border:1px solid var(--border2);}
+
+/* ── Bottom nav ── */
+.bottom-nav{position:fixed;bottom:0;left:0;right:0;background:var(--surface);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);z-index:100;}
+.nav-btn{padding:10px 0 8px;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--text3);cursor:pointer;background:none;border:none;font-family:inherit;transition:color .15s;letter-spacing:.03em;}
+.nav-btn.active{color:var(--indigo);}
+.nav-icon{font-size:18px;line-height:1;}
+
+/* ── Toast ── */
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:var(--surface);border:1px solid var(--green);color:var(--green);font-size:13px;font-weight:500;padding:10px 18px;border-radius:var(--radius);z-index:9999;white-space:nowrap;animation:fadeDown .2s ease;}
+@keyframes fadeDown{from{opacity:0;transform:translate(-50%,-8px)}to{opacity:1;transform:translate(-50%,0)}}
+
+/* ── Page transitions ── */
+.page{animation:fadeUp .18s ease;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Auth ── */
+.auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);}
+.auth-box{width:100%;max-width:380px;}
+.logo-mark{width:44px;height:44px;background:linear-gradient(135deg,#5b6cf9,#818cf8);border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;letter-spacing:-.5px;box-shadow:0 4px 24px rgba(91,108,249,.4);}
+
+/* ── Stat ring ── */
+.stat-ring{position:relative;}
+
+/* ── Section title ── */
+.section-title{font-size:13px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;}
+
+/* ── Empty state ── */
+.empty{text-align:center;padding:48px 20px;color:var(--text3);}
+.empty .icon{font-size:36px;margin-bottom:10px;}
+.empty p{font-size:14px;}
+
+/* ── Lead row ── */
+.lead-row{padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:8px;}
+.lead-row:hover{border-color:var(--indigo);background:var(--surface2);}
+.lead-row:active{background:var(--surface2);}
 </style>
 </head>
 <body>
 
-<!-- ═══ AUTH ══════════════════════════════════════════════════════════════════ -->
-<div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
-  <div class="w-full max-w-sm">
+<!-- ════════════════════════════════ AUTH ════════════════════════════════ -->
+<div id="auth-screen" class="auth-wrap">
+  <div class="auth-box">
 
-    <!-- Logo -->
-    <div class="flex items-center gap-3 justify-center mb-8">
-      <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-bold text-white text-xl">Z</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px;">
+      <div class="logo-mark">Z</div>
       <div>
-        <h1 class="text-2xl font-bold tracking-tight">ZilloAgent</h1>
-        <p class="text-xs text-gray-500">AI-Powered Real Estate Outreach</p>
+        <div style="font-weight:700;font-size:18px;letter-spacing:-.3px;">ZilloAgent</div>
+        <div style="font-size:12px;color:var(--text3);margin-top:1px;">AI Real Estate Outreach</div>
       </div>
     </div>
 
-    <!-- ── LOGIN ── -->
-    <div id="login-form" class="card p-6">
-      <h2 class="text-lg font-semibold mb-5">Sign in to your account</h2>
-      <div class="space-y-3">
-        <div>
-          <label class="field-label">Phone number or Email</label>
-          <input id="login-identifier" class="input" type="text" placeholder="+1 (555) 000-0000" autocomplete="username"/>
-        </div>
-        <div>
-          <label class="field-label">Password</label>
-          <input id="login-password" class="input" type="password" placeholder="••••••••" autocomplete="current-password"/>
-        </div>
-        <button onclick="doLogin()" class="btn btn-primary w-full mt-1">Sign in</button>
+    <!-- Login -->
+    <div id="login-form" class="card">
+      <div style="margin-bottom:22px;">
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Welcome back</div>
+        <div style="font-size:13px;color:var(--text3);">Sign in with your phone number or email</div>
       </div>
-      <p class="text-center text-sm text-gray-500 mt-5">
-        Don't have an account? <button onclick="showSignup()" class="text-indigo-400 hover:underline font-medium">Create one free</button>
-      </p>
-      <div id="login-error" class="text-red-400 text-xs mt-3 hidden p-2 bg-red-950 rounded-lg"></div>
+      <div class="field">
+        <label>Phone number or email</label>
+        <input id="login-identifier" class="input" type="text" placeholder="+1 (555) 000-0000"/>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input id="login-password" class="input" type="password" placeholder="••••••••"/>
+      </div>
+      <div id="login-error" style="display:none;background:var(--red-dim);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;border:1px solid #3d1010;"></div>
+      <button onclick="doLogin()" class="btn btn-primary btn-full" style="margin-top:4px;">Sign in</button>
+      <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text3);">
+        New here? <button onclick="showSignup()" style="background:none;border:none;color:var(--indigo);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;">Create a free account →</button>
+      </div>
     </div>
 
-    <!-- ── SIGNUP ── -->
-    <div id="signup-form" class="card p-6 hidden">
-      <h2 class="text-lg font-semibold mb-1">Create your agent account</h2>
-      <p class="text-xs text-gray-500 mb-5">Your phone number will be used to call and text clients.</p>
-      <div class="space-y-3">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="field-label">Full name <span class="text-red-400">*</span></label>
-            <input id="su-name"    class="input" type="text"  placeholder="John Smith"/>
-          </div>
-          <div>
-            <label class="field-label">Company name</label>
-            <input id="su-company" class="input" type="text"  placeholder="Smith Realty"/>
-          </div>
-        </div>
-        <div>
-          <label class="field-label">Your phone number <span class="text-red-400">*</span></label>
-          <input id="su-phone" class="input" type="tel" placeholder="+1 (555) 000-0000"/>
-          <p class="text-xs text-gray-500 mt-1">Clients will receive calls &amp; texts from this number. Also used to sign in.</p>
-        </div>
-        <div>
-          <label class="field-label">Email address <span class="text-gray-500">(optional)</span></label>
-          <input id="su-email" class="input" type="email" placeholder="you@example.com — for hot-lead alerts"/>
-        </div>
-        <div>
-          <label class="field-label">Password <span class="text-red-400">*</span></label>
-          <input id="su-password" class="input" type="password" placeholder="Min 6 characters"/>
-        </div>
-        <div>
-          <label class="field-label">Confirm password <span class="text-red-400">*</span></label>
-          <input id="su-confirm"  class="input" type="password" placeholder="Re-enter password"/>
-        </div>
-        <button onclick="doSignup()" class="btn btn-primary w-full mt-1">Create account</button>
+    <!-- Signup -->
+    <div id="signup-form" class="card" style="display:none;">
+      <div style="margin-bottom:22px;">
+        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Create your account</div>
+        <div style="font-size:13px;color:var(--text3);">Your phone number will be used to call and text clients</div>
       </div>
-      <p class="text-center text-sm text-gray-500 mt-5">
-        Already have an account? <button onclick="showLogin()" class="text-indigo-400 hover:underline font-medium">Sign in</button>
-      </p>
-      <div id="signup-error" class="text-red-400 text-xs mt-3 hidden p-2 bg-red-950 rounded-lg"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Full name <span style="color:var(--red)">*</span></label>
+          <input id="su-name" class="input" type="text" placeholder="John Smith"/>
+        </div>
+        <div class="field">
+          <label>Company name</label>
+          <input id="su-company" class="input" type="text" placeholder="Smith Realty"/>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Phone number <span style="color:var(--red)">*</span></label>
+        <input id="su-phone" class="input" type="tel" placeholder="+1 (555) 000-0000"/>
+        <div class="hint">Clients will receive calls & texts from this number. Used to sign in.</div>
+      </div>
+
+      <div class="field">
+        <label>Email address <span style="color:var(--text3);font-weight:400;">(optional — for alerts)</span></label>
+        <input id="su-email" class="input" type="email" placeholder="you@example.com"/>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="field">
+          <label>Password <span style="color:var(--red)">*</span></label>
+          <input id="su-password" class="input" type="password" placeholder="Min 6 chars"/>
+        </div>
+        <div class="field">
+          <label>Confirm password <span style="color:var(--red)">*</span></label>
+          <input id="su-confirm" class="input" type="password" placeholder="Re-enter"/>
+        </div>
+      </div>
+
+      <div id="signup-error" style="display:none;background:var(--red-dim);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;border:1px solid #3d1010;"></div>
+      <button onclick="doSignup()" class="btn btn-primary btn-full">Create account</button>
+      <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text3);">
+        Already have an account? <button onclick="showLogin()" style="background:none;border:none;color:var(--indigo);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;">Sign in →</button>
+      </div>
     </div>
 
   </div>
 </div>
 
-<!-- ═══ APP ════════════════════════════════════════════════════════════════════ -->
-<div id="app-screen" class="hidden min-h-screen pb-16">
+<!-- ════════════════════════════════ APP ════════════════════════════════ -->
+<div id="app-screen" style="display:none;min-height:100vh;padding-bottom:68px;">
 
   <!-- Top Bar -->
-  <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800 sticky top-0 z-20" style="background:#0f1117;">
-    <div class="flex items-center gap-2">
-      <div class="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-sm">Z</div>
+  <div style="position:sticky;top:0;z-index:50;background:rgba(12,14,20,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div class="logo-mark" style="width:32px;height:32px;font-size:15px;border-radius:10px;">Z</div>
       <div>
-        <span class="font-semibold text-sm leading-none">ZilloAgent</span>
-        <p id="top-company" class="text-xs text-gray-500 leading-none mt-0.5"></p>
+        <div style="font-weight:700;font-size:14px;line-height:1.2;">ZilloAgent</div>
+        <div id="top-company" style="font-size:11px;color:var(--text3);line-height:1.2;"></div>
       </div>
     </div>
-    <div class="flex items-center gap-3">
-      <span id="agent-name-badge" class="text-xs text-gray-400 truncate max-w-28"></span>
-      <button onclick="doLogout()" class="text-xs text-gray-500 hover:text-white border border-gray-700 rounded-lg px-2 py-1">Sign out</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="agent-name-badge" style="font-size:12px;color:var(--text2);max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+      <button onclick="doLogout()" class="btn btn-ghost btn-sm">Sign out</button>
     </div>
   </div>
 
   <!-- Setup Banner -->
-  <div id="setup-banner" class="hidden mx-4 mt-3 bg-yellow-950 border border-yellow-800 rounded-xl p-3 text-sm">
-    ⚠️ <strong>Action required:</strong> Connect your Twilio credentials to start sending outreach.
-    <button onclick="showPage('settings')" class="underline font-semibold ml-1 text-yellow-300">Set up now →</button>
+  <div id="setup-banner" style="display:none;margin:12px 16px;background:linear-gradient(135deg,#2a1e08,#1a1400);border:1px solid #5a3e10;border-radius:var(--radius);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div>
+      <div style="font-size:13px;font-weight:600;color:var(--orange);">⚡ Action required</div>
+      <div style="font-size:12px;color:#a07040;margin-top:2px;">Connect your Twilio credentials to start sending outreach</div>
+    </div>
+    <button onclick="showPage('settings')" class="btn btn-sm" style="background:var(--orange);color:#000;font-weight:700;white-space:nowrap;flex-shrink:0;">Set up →</button>
   </div>
 
   <!-- Pages -->
-  <div id="page-home"     class="p-4 slide-in"></div>
-  <div id="page-inbox"    class="p-4 slide-in hidden"></div>
-  <div id="page-lead"     class="p-4 slide-in hidden"></div>
-  <div id="page-outreach" class="p-4 slide-in hidden"></div>
-  <div id="page-settings" class="p-4 slide-in hidden"></div>
+  <div id="page-home"     class="page" style="padding:16px;"></div>
+  <div id="page-inbox"    class="page" style="padding:16px;display:none;"></div>
+  <div id="page-lead"     class="page" style="padding:16px;display:none;"></div>
+  <div id="page-outreach" class="page" style="padding:16px;display:none;"></div>
+  <div id="page-settings" class="page" style="padding:16px;display:none;"></div>
 
   <!-- Bottom Nav -->
-  <div class="fixed bottom-0 left-0 right-0 border-t border-gray-800 grid grid-cols-4 z-20" style="background:#0f1117;">
-    <button onclick="showPage('home')"     id="nav-home"     class="py-2 text-center text-xs font-medium flex flex-col items-center gap-0.5">
-      <span class="text-base">🏠</span><span>Home</span>
-    </button>
-    <button onclick="showPage('inbox')"    id="nav-inbox"    class="py-2 text-center text-xs font-medium flex flex-col items-center gap-0.5">
-      <span class="text-base">💬</span><span>Inbox</span>
-    </button>
-    <button onclick="showPage('outreach')" id="nav-outreach" class="py-2 text-center text-xs font-medium flex flex-col items-center gap-0.5">
-      <span class="text-base">🚀</span><span>Outreach</span>
-    </button>
-    <button onclick="showPage('settings')" id="nav-settings" class="py-2 text-center text-xs font-medium flex flex-col items-center gap-0.5">
-      <span class="text-base">⚙️</span><span>Settings</span>
-    </button>
-  </div>
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-home"     onclick="showPage('home')">    <span class="nav-icon">⌂</span>Home</button>
+    <button class="nav-btn"        id="nav-inbox"    onclick="showPage('inbox')">   <span class="nav-icon">💬</span>Inbox</button>
+    <button class="nav-btn"        id="nav-outreach" onclick="showPage('outreach')"><span class="nav-icon">⚡</span>Outreach</button>
+    <button class="nav-btn"        id="nav-settings" onclick="showPage('settings')"><span class="nav-icon">⚙</span>Settings</button>
+  </nav>
 </div>
 
 <script>
@@ -160,546 +249,499 @@ const API = 'https://zilloagent-production.up.railway.app';
 let token = localStorage.getItem('za_token');
 let agent = null;
 
-// ── API helper ────────────────────────────────────────────────────────────────
+// ── API ───────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
-  const opts = {
-    method,
-    headers: {'Content-Type':'application/json', ...(token ? {Authorization:`Bearer ${token}`} : {})},
-  };
+  const opts = { method, headers: {'Content-Type':'application/json', ...(token?{Authorization:`Bearer ${token}`}:{})} };
   if (body) opts.body = JSON.stringify(body);
   const r = await fetch(API + path, opts);
-  const data = await r.json();
-  if (!r.ok) throw new Error(data.detail || JSON.stringify(data));
-  return data;
+  const d = await r.json();
+  if (!r.ok) throw new Error(d.detail || JSON.stringify(d));
+  return d;
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-function showLogin()  { document.getElementById('signup-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); }
-function showSignup() { document.getElementById('login-form').classList.add('hidden');  document.getElementById('signup-form').classList.remove('hidden'); }
+function showLogin()  { document.getElementById('signup-form').style.display='none'; document.getElementById('login-form').style.display=''; }
+function showSignup() { document.getElementById('login-form').style.display='none';  document.getElementById('signup-form').style.display=''; }
 
-function showErr(id, msg) {
-  const el = document.getElementById(id);
-  el.textContent = msg; el.classList.remove('hidden');
-}
-function hideErr(id) { document.getElementById(id).classList.add('hidden'); }
+function showErr(id,msg){ const e=document.getElementById(id); e.textContent=msg; e.style.display=''; }
+function hideErr(id)    { document.getElementById(id).style.display='none'; }
 
-function normalizePhone(p) {
-  const d = p.replace(/\D/g,'');
-  if (d.length === 10) return '+1' + d;
-  if (d.length === 11 && d[0] === '1') return '+' + d;
-  if (d.startsWith('+')) return p.replace(/[^\d+]/g,'');
-  return '+' + d;
+function normPhone(p){
+  const d=p.replace(/\D/g,'');
+  if(d.length===10) return '+1'+d;
+  if(d.length===11&&d[0]==='1') return '+'+d;
+  return '+'+d;
 }
 
-async function doLogin() {
+async function doLogin(){
   hideErr('login-error');
-  const identifier = document.getElementById('login-identifier').value.trim();
-  const pass       = document.getElementById('login-password').value;
-  if (!identifier||!pass) { showErr('login-error','Please enter your phone number (or email) and password.'); return; }
-  try {
-    const d = await api('POST','/auth/login',{identifier, password:pass});
-    token = d.token; agent = d.agent;
-    localStorage.setItem('za_token', token);
-    enterApp();
-  } catch(e) { showErr('login-error', e.message); }
+  const id  = document.getElementById('login-identifier').value.trim();
+  const pw  = document.getElementById('login-password').value;
+  if(!id||!pw){showErr('login-error','Please enter your phone number and password.'); return;}
+  try{
+    const d = await api('POST','/auth/login',{identifier:id,password:pw});
+    token=d.token; agent=d.agent; localStorage.setItem('za_token',token); enterApp();
+  }catch(e){showErr('login-error',e.message);}
 }
 
-async function doSignup() {
+async function doSignup(){
   hideErr('signup-error');
-  const name    = document.getElementById('su-name').value.trim();
-  const company = document.getElementById('su-company').value.trim();
-  const phone   = document.getElementById('su-phone').value.trim();
-  const email   = document.getElementById('su-email').value.trim();
-  const pass    = document.getElementById('su-password').value;
-  const confirm = document.getElementById('su-confirm').value;
-  if (!name)  { showErr('signup-error','Full name is required.'); return; }
-  if (!phone) { showErr('signup-error','Phone number is required — clients will call and text from this number.'); return; }
-  if (!pass)  { showErr('signup-error','Password is required.'); return; }
-  if (pass.length < 6) { showErr('signup-error','Password must be at least 6 characters.'); return; }
-  if (pass !== confirm) { showErr('signup-error','Passwords do not match.'); return; }
-  try {
-    const d = await api('POST','/auth/signup',{
-      name, company: company||null, phone: normalizePhone(phone),
-      email: email||null, password: pass
-    });
-    token = d.token; agent = d.agent;
-    localStorage.setItem('za_token', token);
-    enterApp();
-  } catch(e) { showErr('signup-error', e.message); }
+  const name   = document.getElementById('su-name').value.trim();
+  const co     = document.getElementById('su-company').value.trim();
+  const phone  = document.getElementById('su-phone').value.trim();
+  const email  = document.getElementById('su-email').value.trim();
+  const pw     = document.getElementById('su-password').value;
+  const pw2    = document.getElementById('su-confirm').value;
+  if(!name)    {showErr('signup-error','Full name is required.'); return;}
+  if(!phone)   {showErr('signup-error','Phone number is required.'); return;}
+  if(!pw)      {showErr('signup-error','Password is required.'); return;}
+  if(pw.length<6){showErr('signup-error','Password must be at least 6 characters.'); return;}
+  if(pw!==pw2) {showErr('signup-error','Passwords do not match.'); return;}
+  try{
+    const d = await api('POST','/auth/signup',{name,company:co||null,phone:normPhone(phone),email:email||null,password:pw});
+    token=d.token; agent=d.agent; localStorage.setItem('za_token',token); enterApp();
+  }catch(e){showErr('signup-error',e.message);}
 }
 
-function doLogout() {
+function doLogout(){
   localStorage.removeItem('za_token'); token=null; agent=null;
-  document.getElementById('app-screen').classList.add('hidden');
-  document.getElementById('auth-screen').classList.remove('hidden');
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='';
   showLogin();
 }
 
-async function enterApp() {
-  document.getElementById('auth-screen').classList.add('hidden');
-  document.getElementById('app-screen').classList.remove('hidden');
-  if (!agent) {
-    try { agent = await api('GET','/auth/me'); } catch(e) { doLogout(); return; }
-  }
-  document.getElementById('agent-name-badge').textContent = agent.name || '';
-  document.getElementById('top-company').textContent = agent.company || '';
-  const credsMissing = !agent.has_twilio;
-  if (credsMissing) document.getElementById('setup-banner').classList.remove('hidden');
-  else              document.getElementById('setup-banner').classList.add('hidden');
+async function enterApp(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='';
+  if(!agent){ try{agent=await api('GET','/auth/me');}catch(e){doLogout();return;} }
+  document.getElementById('agent-name-badge').textContent = agent.name||'';
+  document.getElementById('top-company').textContent = agent.company||'';
+  const banner = document.getElementById('setup-banner');
+  if(!agent.has_twilio) banner.style.display='flex'; else banner.style.display='none';
   showPage('home');
 }
 
-if (token) {
-  api('GET','/auth/me').then(a=>{agent=a; enterApp();}).catch(()=>{localStorage.removeItem('za_token'); token=null;});
-}
+if(token){ api('GET','/auth/me').then(a=>{agent=a;enterApp();}).catch(()=>{localStorage.removeItem('za_token');token=null;}); }
 
-// ── Navigation ────────────────────────────────────────────────────────────────
-function showPage(name) {
-  ['home','inbox','outreach','settings','lead'].forEach(p => document.getElementById(`page-${p}`).classList.add('hidden'));
-  ['home','inbox','outreach','settings'].forEach(p => {
-    const n = document.getElementById(`nav-${p}`);
-    if (n) n.className = 'py-2 text-center text-xs font-medium flex flex-col items-center gap-0.5 text-gray-500';
+// ── Nav ───────────────────────────────────────────────────────────────────────
+function showPage(name){
+  ['home','inbox','outreach','settings','lead'].forEach(p=>{
+    document.getElementById(`page-${p}`).style.display='none';
   });
-  document.getElementById(`page-${name}`).classList.remove('hidden');
-  const nav = document.getElementById(`nav-${name}`);
-  if (nav) nav.className = 'py-2 text-center text-xs font-medium flex flex-col items-center gap-0.5 text-indigo-400';
-  if (name==='home')     renderHome();
-  if (name==='inbox')    renderInbox();
-  if (name==='outreach') renderOutreach();
-  if (name==='settings') renderSettings();
+  ['home','inbox','outreach','settings'].forEach(p=>{
+    const n=document.getElementById(`nav-${p}`);
+    if(n){n.classList.remove('active');}
+  });
+  document.getElementById(`page-${name}`).style.display='';
+  const nav=document.getElementById(`nav-${name}`);
+  if(nav) nav.classList.add('active');
+  if(name==='home')     renderHome();
+  if(name==='inbox')    renderInbox();
+  if(name==='outreach') renderOutreach();
+  if(name==='settings') renderSettings();
 }
 
 // ── HOME ──────────────────────────────────────────────────────────────────────
-async function renderHome() {
-  const el = document.getElementById('page-home');
-  el.innerHTML = '<p class="text-center text-gray-500 text-sm py-12">Loading dashboard...</p>';
-  try {
-    const s = await api('GET','/stats/today');
-    el.innerHTML = `
-      <h2 class="text-lg font-bold mb-4">Dashboard</h2>
-      <div class="grid grid-cols-2 gap-3 mb-5">
-        ${sc('Messages Today', s.messages_sent_today??0, 'text-blue-400')}
-        ${sc('Hot Leads 🔥',   s.hot_leads??0,          'text-orange-400')}
-        ${sc('Response Rate',  (s.response_rate??0)+'%','text-green-400')}
-        ${sc('Total Leads',    s.total_leads??0,         'text-purple-400')}
+async function renderHome(){
+  const el=document.getElementById('page-home');
+  el.innerHTML=`<div style="padding:40px 0;text-align:center;color:var(--text3);font-size:13px;">Loading…</div>`;
+  try{
+    const s=await api('GET','/stats/today');
+    const smsUsed=s.sms_today??0, smsMax=s.sms_limit??350;
+    const callUsed=s.calls_today??0, callMax=s.call_limit??20;
+    el.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;">
+        <div>
+          <div style="font-size:20px;font-weight:700;letter-spacing:-.4px;">Dashboard</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${new Date().toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})}</div>
+        </div>
+        <button onclick="renderHome()" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:18px;padding:4px;">↻</button>
       </div>
-      <div class="card p-4 mb-4">
-        <p class="text-sm font-semibold mb-3">Consent Pipeline</p>
-        <div class="flex gap-2">
-          <div class="flex-1 bg-yellow-950 border border-yellow-900 rounded-xl p-3 text-center">
-            <p class="text-3xl font-bold text-yellow-300">${s.pending??0}</p>
-            <p class="text-xs text-yellow-600 mt-1">⏳ Pending</p>
-          </div>
-          <div class="flex-1 bg-green-950 border border-green-900 rounded-xl p-3 text-center">
-            <p class="text-3xl font-bold text-green-300">${s.consented??0}</p>
-            <p class="text-xs text-green-700 mt-1">✅ Consented</p>
-          </div>
-          <div class="flex-1 bg-red-950 border border-red-900 rounded-xl p-3 text-center">
-            <p class="text-3xl font-bold text-red-300">${s.opted_out??0}</p>
-            <p class="text-xs text-red-700 mt-1">🚫 Opted Out</p>
-          </div>
+
+      <!-- 4 stat cards -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;">
+        ${sCard('Total Leads',s.total_leads??0,'#5b6cf9')}
+        ${sCard('Hot Leads 🔥',s.hot_leads??0,'#f59e0b')}
+        ${sCard('Response Rate',(s.response_rate??0)+'%','#22c55e')}
+        ${sCard('Consented',s.consented??0,'#818cf8')}
+      </div>
+
+      <!-- Consent pipeline -->
+      <div class="card" style="margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;">Consent Pipeline</div>
+        <div style="display:flex;gap:8px;">
+          ${pipeCard('Pending',   s.pending??0,  '#f59e0b','#2a1e08')}
+          ${pipeCard('Consented', s.consented??0,'#22c55e','#0a2e1a')}
+          ${pipeCard('Opted Out', s.opted_out??0,'#ef4444','#2a0e0e')}
         </div>
       </div>
-      <div class="card p-4 mb-4">
-        <p class="text-sm font-semibold mb-3">Today's Usage</p>
-        <div class="space-y-3">
-          ${usageBar('📱 SMS', s.sms_today??0, s.sms_limit??350)}
-          ${usageBar('📞 Calls', s.calls_today??0, s.call_limit??20)}
-        </div>
+
+      <!-- Daily usage -->
+      <div class="card" style="margin-bottom:16px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;">Today's Usage</div>
+        ${uBar('SMS sent', smsUsed, smsMax)}
+        <div style="margin-top:12px;"></div>
+        ${uBar('Calls made', callUsed, callMax)}
       </div>
-      <button onclick="showPage('outreach')" class="btn btn-primary w-full mb-3">🚀 Start New Outreach Campaign</button>
-      <button onclick="showPage('inbox')"    class="btn btn-secondary w-full">💬 View All Leads →</button>
+
+      <button onclick="showPage('outreach')" class="btn btn-primary btn-full" style="margin-bottom:10px;">⚡ Start Outreach Campaign</button>
+      <button onclick="showPage('inbox')"    class="btn btn-ghost   btn-full">View Inbox →</button>
     `;
-  } catch(e) {
-    el.innerHTML = `<p class="text-red-400 text-sm text-center py-12">${e.message}</p>`;
+  }catch(e){
+    el.innerHTML=`<div style="padding:40px 0;text-align:center;color:var(--red);font-size:13px;">${e.message}</div>`;
   }
 }
 
-function sc(label, val, cls) {
-  return `<div class="card p-4"><p class="text-xs text-gray-500 mb-1">${label}</p><p class="text-3xl font-bold ${cls}">${val}</p></div>`;
+function sCard(label,val,color){
+  return `<div class="card card-sm" style="border-color:${color}22;">
+    <div style="font-size:11px;color:var(--text3);font-weight:500;margin-bottom:6px;">${label}</div>
+    <div style="font-size:28px;font-weight:700;color:${color};letter-spacing:-.5px;">${val}</div>
+  </div>`;
 }
 
-function usageBar(label, used, limit) {
-  const pct  = Math.min(100, Math.round(used / limit * 100));
-  const left = limit - used;
-  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-indigo-500';
-  return `
-    <div>
-      <div class="flex justify-between text-xs mb-1">
-        <span class="text-gray-300 font-medium">${label}</span>
-        <span class="text-gray-400">${used} / ${limit} <span class="text-gray-600">· ${left} left</span></span>
-      </div>
-      <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
-        <div class="${color} h-2 rounded-full transition-all" style="width:${pct}%"></div>
-      </div>
-    </div>`;
+function pipeCard(label,val,color,bg){
+  return `<div style="flex:1;background:${bg};border:1px solid ${color}33;border-radius:10px;padding:12px;text-align:center;">
+    <div style="font-size:26px;font-weight:700;color:${color};">${val}</div>
+    <div style="font-size:11px;color:${color}99;font-weight:500;margin-top:3px;">${label}</div>
+  </div>`;
+}
+
+function uBar(label, used, max){
+  const pct=Math.min(100,Math.round(used/max*100));
+  const left=max-used;
+  const c=pct>=90?'#ef4444':pct>=70?'#f59e0b':'#5b6cf9';
+  return `<div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">
+      <span style="color:var(--text);font-weight:500;">${label}</span>
+      <span style="color:var(--text3);">${used}<span style="color:var(--border2);">/${max}</span> &nbsp;<span style="color:var(--text3);">${left} left</span></span>
+    </div>
+    <div class="usage-track">
+      <div class="usage-fill" style="width:${pct}%;background:${c};"></div>
+    </div>
+  </div>`;
 }
 
 // ── INBOX ─────────────────────────────────────────────────────────────────────
-let inboxFilter = 'all';
-
-async function renderInbox() {
-  const el = document.getElementById('page-inbox');
-  el.innerHTML = `
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="text-lg font-bold">Inbox</h2>
+let F='all';
+async function renderInbox(){
+  const el=document.getElementById('page-inbox');
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:20px;font-weight:700;letter-spacing:-.4px;">Inbox</div>
     </div>
-    <div class="flex gap-1.5 mb-4 overflow-x-auto pb-1">
-      ${['all','pending','consented','opted_out'].map(f =>
-        `<button onclick="setFilter('${f}')"
-          class="flex-none px-3 py-1.5 rounded-lg text-xs font-semibold ${inboxFilter===f?'bg-indigo-600 text-white':'bg-gray-800 text-gray-400 hover:text-white'}">${f.replace('_',' ')}</button>`
-      ).join('')}
+    <div style="display:flex;gap:6px;margin-bottom:16px;overflow-x:auto;padding-bottom:2px;">
+      ${['all','pending','consented','opted_out'].map(f=>`
+        <button onclick="setF('${f}')" style="flex:none;padding:6px 12px;border-radius:20px;font-size:12px;font-weight:600;border:none;cursor:pointer;font-family:inherit;
+          ${F===f?'background:var(--indigo);color:#fff;':'background:var(--surface2);color:var(--text2);border:1px solid var(--border2);'}">${f.replace('_',' ')}</button>
+      `).join('')}
     </div>
-    <div id="leads-list"><p class="text-center text-gray-500 text-sm py-12">Loading...</p></div>
+    <div id="leads-list"><div style="padding:40px 0;text-align:center;color:var(--text3);font-size:13px;">Loading…</div></div>
   `;
   await loadLeads();
 }
 
-function setFilter(f) { inboxFilter=f; renderInbox(); }
+function setF(f){F=f;renderInbox();}
 
-async function loadLeads() {
-  const el = document.getElementById('leads-list'); if(!el) return;
-  try {
-    const path = inboxFilter==='all' ? '/leads' : `/leads?consent_status=${inboxFilter}`;
-    const leads = await api('GET', path);
-    if (!leads.length) { el.innerHTML='<p class="text-center text-gray-500 text-sm py-12">No leads yet. Start an outreach campaign to get leads.</p>'; return; }
-    el.innerHTML = leads.map(l => `
-      <div onclick="openLead(${l.id})" class="card p-4 mb-3 cursor-pointer hover:border-indigo-600 transition-colors">
-        <div class="flex items-start justify-between gap-2">
-          <div class="min-w-0 flex-1">
-            <p class="font-medium text-sm truncate">${l.contact_name||'Unknown'}</p>
-            <p class="text-xs text-gray-500 truncate mt-0.5">${l.contact_phone||l.contact_email||'—'}</p>
+async function loadLeads(){
+  const el=document.getElementById('leads-list'); if(!el) return;
+  try{
+    const path=F==='all'?'/leads':`/leads?consent_status=${F}`;
+    const leads=await api('GET',path);
+    if(!leads.length){
+      el.innerHTML=`<div class="empty"><div class="icon">📭</div><p>No leads yet.<br>Start an outreach campaign to get leads.</p></div>`;
+      return;
+    }
+    el.innerHTML=leads.map(l=>`
+      <div class="lead-row" onclick="openLead(${l.id})">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+          <div style="min-width:0;flex:1;">
+            <div style="font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.contact_name||'Unknown'}</div>
+            <div style="font-size:12px;color:var(--text3);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.contact_phone||l.contact_email||'—'}</div>
           </div>
-          <div class="flex flex-col items-end gap-1 shrink-0">
-            ${badge(l.consent_status)}
-            ${(l.score||0)>=7?'<span class="text-xs text-orange-400 font-medium">🔥 Hot</span>':''}
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex-shrink:0;">
+            ${badgeHtml(l.consent_status)}
+            ${(l.score||0)>=7?'<span style="font-size:11px;color:#f59e0b;font-weight:600;">🔥 Hot</span>':''}
           </div>
         </div>
-        ${l.human_takeover?'<p class="text-xs text-yellow-400 mt-2 font-medium">👤 Human takeover active</p>':''}
+        ${l.human_takeover?'<div style="margin-top:8px;font-size:11px;color:#f59e0b;font-weight:500;">👤 Human takeover active</div>':''}
       </div>
     `).join('');
-  } catch(e) { el.innerHTML=`<p class="text-red-400 text-sm text-center py-12">${e.message}</p>`; }
+  }catch(e){el.innerHTML=`<div style="padding:40px 0;text-align:center;color:var(--red);font-size:13px;">${e.message}</div>`;}
 }
 
-function badge(s) {
-  if (s==='consented') return '<span class="badge-consented text-xs px-2 py-0.5 rounded-full font-semibold">✅ Consented</span>';
-  if (s==='opted_out') return '<span class="badge-optedout text-xs px-2 py-0.5 rounded-full font-semibold">🚫 Opted Out</span>';
-  return '<span class="badge-pending text-xs px-2 py-0.5 rounded-full font-semibold">⏳ Pending</span>';
+function badgeHtml(s){
+  if(s==='consented') return '<span class="badge badge-consented">● Consented</span>';
+  if(s==='opted_out') return '<span class="badge badge-optedout">✕ Opted Out</span>';
+  return '<span class="badge badge-pending">◌ Pending</span>';
 }
 
-// ── LEAD DETAIL ───────────────────────────────────────────────────────────────
-async function openLead(id) {
+// ── LEAD ──────────────────────────────────────────────────────────────────────
+async function openLead(id){
   showPage('lead');
-  const el = document.getElementById('page-lead');
-  el.innerHTML = '<p class="text-center text-gray-500 text-sm py-12">Loading...</p>';
-  try {
-    const l = await api('GET', `/leads/${id}`);
-    el.innerHTML = `
-      <div class="flex items-center gap-3 mb-5">
-        <button onclick="showPage('inbox')" class="text-gray-400 hover:text-white text-2xl leading-none">←</button>
-        <div class="flex-1 min-w-0">
-          <p class="font-semibold truncate">${l.contact_name||'Unknown'}</p>
-          <p class="text-xs text-gray-500 truncate">${[l.contact_phone,l.contact_email].filter(Boolean).join(' · ')}</p>
+  const el=document.getElementById('page-lead');
+  el.innerHTML=`<div style="padding:40px 0;text-align:center;color:var(--text3);font-size:13px;">Loading…</div>`;
+  try{
+    const l=await api('GET',`/leads/${id}`);
+    el.innerHTML=`
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:20px;">
+        <button onclick="showPage('inbox')" style="background:none;border:none;color:var(--text2);cursor:pointer;font-size:22px;line-height:1;padding:4px;">‹</button>
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${l.contact_name||'Unknown'}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">${[l.contact_phone,l.contact_email].filter(Boolean).join(' · ')}</div>
         </div>
-        ${badge(l.consent_status)}
+        ${badgeHtml(l.consent_status)}
       </div>
 
       ${l.call_recording?`
-      <div class="card p-4 mb-4">
-        <p class="text-sm font-semibold mb-2">🎧 Call Recording</p>
-        <audio controls class="w-full" src="${l.call_recording}"></audio>
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">🎧 Call Recording</div>
+        <audio controls style="width:100%;" src="${l.call_recording}"></audio>
       </div>`:''}
 
-      <div class="card p-4 mb-4">
-        <p class="text-sm font-semibold mb-3">Conversation</p>
-        <div class="space-y-2 max-h-64 overflow-y-auto">
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Conversation</div>
+        <div style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;">
           ${(l.messages||[]).length?(l.messages).map(m=>`
-            <div class="flex ${m.direction==='outbound'?'justify-end':'justify-start'}">
-              <div class="max-w-xs px-3 py-2 rounded-2xl text-xs ${m.direction==='outbound'?'bg-indigo-600 text-white':'bg-gray-700 text-gray-200'}">
-                <p>${m.content||''}</p>
-                <p class="opacity-50 mt-1 text-right">${(m.created_at||'').slice(11,16)} · ${m.type||''}</p>
+            <div style="display:flex;justify-content:${m.direction==='outbound'?'flex-end':'flex-start'};">
+              <div class="${m.direction==='outbound'?'bubble-out':'bubble-in'}" style="max-width:80%;padding:9px 13px;font-size:13px;">
+                <div>${m.content||''}</div>
+                <div style="font-size:10px;opacity:.5;margin-top:4px;text-align:right;">${(m.created_at||'').slice(11,16)} · ${m.type||''}</div>
               </div>
             </div>
-          `).join(''):'<p class="text-gray-500 text-xs text-center py-4">No messages yet.</p>'}
+          `).join(''):'<div style="text-align:center;color:var(--text3);font-size:13px;padding:20px 0;">No messages yet</div>'}
         </div>
       </div>
 
       ${!l.human_takeover?`
-      <div class="card p-4 mb-4">
-        <p class="text-sm font-semibold mb-3">Send Message</p>
-        <textarea id="manual-msg" class="input h-20 mb-3" placeholder="Type your message..."></textarea>
-        <div class="flex gap-2">
-          <button onclick="sendMsg(${l.id},'sms')"   class="btn btn-primary  flex-1 text-xs py-2">📱 Send SMS</button>
-          <button onclick="sendMsg(${l.id},'email')" class="btn btn-secondary flex-1 text-xs py-2">📧 Send Email</button>
-          <button onclick="takeover(${l.id})"        class="btn btn-secondary text-xs py-2 px-3" title="Take over from AI">👤</button>
+      <div class="card" style="margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px;">Send Message</div>
+        <textarea id="manual-msg" class="input" style="height:80px;margin-bottom:10px;" placeholder="Type your message…"></textarea>
+        <div style="display:flex;gap:8px;">
+          <button onclick="sendMsg(${l.id},'sms')"   class="btn btn-primary btn-sm" style="flex:1;">📱 Send SMS</button>
+          <button onclick="sendMsg(${l.id},'email')" class="btn btn-ghost  btn-sm" style="flex:1;">📧 Email</button>
+          <button onclick="takeover(${l.id})"        class="btn btn-ghost  btn-sm" title="Take over from AI">👤</button>
         </div>
       </div>`:`
-      <div class="bg-yellow-950 border border-yellow-800 p-3 rounded-xl text-sm mb-4 flex items-center justify-between">
-        <span>👤 Human takeover — AI paused</span>
-        <button onclick="resumeAI(${l.id})" class="text-xs text-yellow-300 underline">Resume AI</button>
+      <div style="background:var(--orange-dim);border:1px solid #5a3e10;border-radius:var(--radius);padding:13px 16px;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;">
+        <div style="font-size:13px;font-weight:500;color:var(--orange);">👤 Human takeover — AI paused</div>
+        <button onclick="resumeAI(${l.id})" style="background:none;border:none;color:var(--orange);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-decoration:underline;">Resume AI</button>
       </div>`}
 
-      <div class="card p-4 text-xs text-gray-500 space-y-1.5">
-        <div class="flex justify-between"><span>Score</span><span class="text-white font-medium">${l.score||0}/10 ${(l.score||0)>=7?'🔥':''}</span></div>
-        <div class="flex justify-between"><span>Status</span><span class="text-white">${l.status||'—'}</span></div>
-        <div class="flex justify-between"><span>Consent</span><span class="text-white">${l.consent_status||'—'}${l.consent_timestamp?' · '+l.consent_timestamp.slice(0,16):''}</span></div>
-        <div class="flex justify-between"><span>Follow-up sent</span><span class="text-white">${l.followup_sent?'Yes':'No'}</span></div>
-        ${l.call_id?`<div class="flex justify-between"><span>Call ID</span><span class="text-white font-mono text-xs">${l.call_id.slice(0,16)}...</span></div>`:''}
+      <div class="card card-sm" style="border-color:var(--border2);">
+        <div style="display:grid;gap:8px;">
+          ${dRow('Score',`${l.score||0}/10 ${(l.score||0)>=7?'🔥':''}`)}
+          ${dRow('Status', l.status||'—')}
+          ${dRow('Consent', l.consent_status+(l.consent_timestamp?' · '+l.consent_timestamp.slice(0,16):''))}
+          ${dRow('Follow-up sent', l.followup_sent?'Yes':'No')}
+          ${l.call_id?dRow('Call ID',`<span style="font-family:monospace;font-size:11px;">${l.call_id.slice(0,20)}…</span>`):''}
+        </div>
       </div>
     `;
-  } catch(e) { el.innerHTML=`<p class="text-red-400 text-sm text-center py-12">${e.message}</p>`; }
+  }catch(e){el.innerHTML=`<div style="padding:40px 0;text-align:center;color:var(--red);font-size:13px;">${e.message}</div>`;}
 }
 
-async function sendMsg(id, type) {
-  const msg = document.getElementById('manual-msg')?.value.trim();
-  if (!msg) return;
-  try {
-    await api('POST',`/leads/${id}/message`,{message:msg,message_type:type});
-    document.getElementById('manual-msg').value='';
-    openLead(id);
-  } catch(e) { alert('Error: '+e.message); }
+function dRow(k,v){
+  return `<div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;">
+    <span style="color:var(--text3);">${k}</span>
+    <span style="color:var(--text);font-weight:500;">${v}</span>
+  </div>`;
 }
 
-async function takeover(id) {
-  try { await api('POST',`/leads/${id}/takeover`); openLead(id); } catch(e) { alert(e.message); }
+async function sendMsg(id,type){
+  const msg=document.getElementById('manual-msg')?.value.trim(); if(!msg) return;
+  try{ await api('POST',`/leads/${id}/message`,{message:msg,message_type:type}); document.getElementById('manual-msg').value=''; openLead(id); }
+  catch(e){ alert(e.message); }
 }
+async function takeover(id){ try{await api('POST',`/leads/${id}/takeover`); openLead(id);}catch(e){alert(e.message);} }
+async function resumeAI(id){ try{await api('DELETE',`/leads/${id}/takeover`); openLead(id);}catch(e){alert(e.message);} }
 
-async function resumeAI(id) {
-  try { await api('DELETE',`/leads/${id}/takeover`); openLead(id); } catch(e) { alert(e.message); }
-}
+// ── OUTREACH ──────────────────────────────────────────────────────────────────
+function renderOutreach(){
+  document.getElementById('page-outreach').innerHTML=`
+    <div style="font-size:20px;font-weight:700;letter-spacing:-.4px;margin-bottom:6px;">⚡ Outreach</div>
+    <div style="font-size:13px;color:var(--text3);margin-bottom:20px;">Launch a consent-based SMS campaign</div>
 
-// ── OUTREACH ─────────────────────────────────────────────────────────────────
-function renderOutreach() {
-  document.getElementById('page-outreach').innerHTML = `
-    <h2 class="text-lg font-bold mb-4">🚀 Outreach Campaign</h2>
-
-    <div class="card p-4 mb-4">
-      <p class="text-sm font-semibold mb-1">Launch a Consent-SMS Campaign</p>
-      <p class="text-xs text-gray-500 mb-4">
-        ZilloAgent finds active listings, texts each owner from <strong class="text-white">your phone number</strong>:
-        <em>"Reply YES for a call, STOP to opt out."</em>
-        Anyone who says YES gets an AI call automatically.
-      </p>
-      <div class="space-y-3 mb-4">
-        <div>
-          <label class="field-label">Target city</label>
-          <input id="o-city" class="input" placeholder="e.g. Los Angeles, CA"/>
-        </div>
-        <div>
-          <label class="field-label">Max contacts</label>
-          <input id="o-limit" class="input" type="number" value="15" min="1" max="250"/>
-        </div>
+    <div class="card" style="margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:16px;">New Campaign</div>
+      <div class="field">
+        <label>Target city</label>
+        <input id="o-city" class="input" placeholder="e.g. Los Angeles, CA"/>
       </div>
-      <button onclick="startOutreach()" class="btn btn-primary w-full">Launch Campaign</button>
-      <div id="o-result" class="mt-3 text-sm hidden rounded-xl p-3"></div>
+      <div class="field">
+        <label>Max contacts</label>
+        <input id="o-limit" class="input" type="number" value="15" min="1" max="250"/>
+      </div>
+      <button onclick="startOutreach()" class="btn btn-primary btn-full" style="margin-top:4px;">Launch Campaign</button>
+      <div id="o-result" style="display:none;margin-top:12px;font-size:13px;border-radius:var(--radius-sm);padding:12px 14px;"></div>
     </div>
 
-    <div class="card p-4">
-      <p class="text-sm font-semibold mb-3">How it works</p>
-      <div class="space-y-3 text-xs text-gray-400">
-        <div class="flex gap-3 items-start"><span class="text-base shrink-0">1️⃣</span><span>ZilloAgent pulls active listings in your target city from Zillow</span></div>
-        <div class="flex gap-3 items-start"><span class="text-base shrink-0">2️⃣</span><span>SMS sent from <strong class="text-white">your number</strong>: "Hi [name], I have pre-qualified buyers in [city]. Reply YES to connect, STOP to opt out."</span></div>
-        <div class="flex gap-3 items-start"><span class="text-base shrink-0">3️⃣</span><span>Reply <strong class="text-green-400">YES</strong> → consent logged → AI voice call placed automatically (9 AM–9 PM their time)</span></div>
-        <div class="flex gap-3 items-start"><span class="text-base shrink-0">4️⃣</span><span>Reply <strong class="text-red-400">STOP</strong> → added to Do-Not-Call list permanently</span></div>
-        <div class="flex gap-3 items-start"><span class="text-base shrink-0">5️⃣</span><span>No reply → one follow-up after 3 days, then silence</span></div>
-        <div class="flex gap-3 items-start"><span class="text-base shrink-0">6️⃣</span><span>Score 7+? You get an email alert instantly so you can take over</span></div>
+    <div class="card">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px;">How It Works</div>
+      <div style="display:flex;flex-direction:column;gap:12px;">
+        ${step('1','Finds active listings in your target city from Zillow')}
+        ${step('2','Texts each owner from <strong style="color:var(--text);">your number</strong> — "Reply YES for a call, STOP to opt out"')}
+        ${step('3','<strong style="color:var(--green);">YES</strong> → consent logged → AI voice call placed automatically (9 AM–9 PM local time)')}
+        ${step('4','<strong style="color:var(--red);">STOP</strong> → added to permanent Do-Not-Call list')}
+        ${step('5','No reply → one follow-up after 3 days, then silence')}
+        ${step('6','Score 7+? You get an instant email alert to take over the lead')}
       </div>
     </div>
   `;
 }
 
-async function startOutreach() {
-  const city  = document.getElementById('o-city').value.trim();
-  const limit = parseInt(document.getElementById('o-limit').value)||15;
-  const res   = document.getElementById('o-result');
-  if (!city) { res.textContent='Please enter a target city.'; res.className='mt-3 text-sm rounded-xl p-3 bg-red-950 text-red-400'; res.classList.remove('hidden'); return; }
-  if (!agent?.has_twilio) {
-    res.textContent='You need to connect Twilio credentials before sending outreach. Go to Settings.';
-    res.className='mt-3 text-sm rounded-xl p-3 bg-yellow-950 text-yellow-400'; res.classList.remove('hidden'); return;
-  }
-  try {
+function step(n,text){
+  return `<div style="display:flex;gap:12px;align-items:flex-start;">
+    <div style="width:22px;height:22px;border-radius:6px;background:var(--indigo-dim);border:1px solid var(--indigo)33;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--indigo);flex-shrink:0;">${n}</div>
+    <div style="font-size:13px;color:var(--text2);line-height:1.5;">${text}</div>
+  </div>`;
+}
+
+async function startOutreach(){
+  const city=document.getElementById('o-city').value.trim();
+  const limit=parseInt(document.getElementById('o-limit').value)||15;
+  const res=document.getElementById('o-result');
+  if(!city){res.textContent='Please enter a target city.';res.style.cssText='display:block;background:var(--red-dim);color:var(--red);border:1px solid #3d1010;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;'; return;}
+  if(!agent?.has_twilio){res.innerHTML='Connect your Twilio credentials in <strong>Settings</strong> before launching.';res.style.cssText='display:block;background:var(--orange-dim);color:var(--orange);border:1px solid #5a3e10;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;'; return;}
+  try{
     await api('POST','/outreach/run',{target_area:city,limit});
-    res.textContent = `✅ Campaign launched — up to ${limit} contacts will be texted in ${city}. Replies come to your Twilio number.`;
-    res.className = 'mt-3 text-sm rounded-xl p-3 bg-green-950 text-green-300';
-    res.classList.remove('hidden');
-  } catch(e) {
-    res.textContent = '❌ '+e.message;
-    res.className = 'mt-3 text-sm rounded-xl p-3 bg-red-950 text-red-400';
-    res.classList.remove('hidden');
+    res.textContent=`Campaign launched — up to ${limit} owners in ${city} will be texted from your number.`;
+    res.style.cssText='display:block;background:var(--green-dim);color:var(--green);border:1px solid #1a5e30;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;';
+  }catch(e){
+    res.textContent='Error: '+e.message;
+    res.style.cssText='display:block;background:var(--red-dim);color:var(--red);border:1px solid #3d1010;border-radius:var(--radius-sm);padding:12px 14px;font-size:13px;';
   }
 }
 
 // ── SETTINGS ─────────────────────────────────────────────────────────────────
-function renderSettings() {
-  const a = agent || {};
-  document.getElementById('page-settings').innerHTML = `
-    <h2 class="text-lg font-bold mb-4">⚙️ Settings</h2>
+function renderSettings(){
+  const a=agent||{};
+  document.getElementById('page-settings').innerHTML=`
+    <div style="font-size:20px;font-weight:700;letter-spacing:-.4px;margin-bottom:20px;">Settings</div>
 
     <!-- Profile -->
-    <div class="card p-4 mb-4">
-      <p class="text-sm font-semibold mb-3">Your Profile</p>
-      <div class="space-y-2">
-        <div><label class="field-label">Full name</label>
-          <input id="p-name"    class="input text-xs" value="${a.name||''}" placeholder="Full name"/></div>
-        <div><label class="field-label">Company name</label>
-          <input id="p-company" class="input text-xs" value="${a.company||''}" placeholder="Your company name"/></div>
-        <div><label class="field-label">Email</label>
-          <input class="input text-xs opacity-50" value="${a.email||''}" readonly/></div>
-      </div>
-      <button onclick="saveProfile()" class="btn btn-primary w-full text-xs py-2 mt-3">Save Profile</button>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Profile</div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="field"><label>Full name</label><input id="p-name" class="input" value="${a.name||''}" placeholder="Your name"/></div>
+      <div class="field"><label>Company name</label><input id="p-company" class="input" value="${a.company||''}" placeholder="Your company"/></div>
+      <div class="field"><label>Email <span style="color:var(--text3);font-weight:400;">(optional)</span></label><input id="p-email" class="input" type="email" value="${a.email||''}" placeholder="you@example.com"/></div>
+      <div class="field" style="margin-bottom:0;"><label>Phone number</label><input class="input" value="${a.phone||a.twilio_phone||''}" readonly/><div class="hint">To change your phone, contact support</div></div>
+      <hr class="divider"/>
+      <button onclick="saveProfile()" class="btn btn-primary btn-full">Save Profile</button>
     </div>
 
     <!-- Twilio -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-sm font-semibold">📱 Twilio — SMS & Calls</p>
-        <span class="text-xs font-semibold ${a.has_twilio?'text-green-400':'text-yellow-400'}">${a.has_twilio?'✅ Connected':'⚠️ Not connected'}</span>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Twilio — SMS & Calls</div>
+      <span style="font-size:11px;font-weight:700;color:${a.has_twilio?'var(--green)':'var(--orange)'};">${a.has_twilio?'● Connected':'○ Not connected'}</span>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="field"><label>Account SID</label><input id="t-sid" class="input" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value="${a.twilio_sid||''}"/></div>
+      <div class="field"><label>Auth Token</label><input id="t-token" class="input" type="password" placeholder="Your Twilio auth token"/></div>
+      <div class="field"><label>Outbound Phone Number</label><input id="t-phone" class="input" placeholder="+15550001234" value="${a.twilio_phone||a.phone||''}"/><div class="hint">The number clients will receive your calls and texts from</div></div>
+      <div style="background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:12px;font-size:12px;color:var(--text3);margin-bottom:14px;line-height:1.6;">
+        <div style="font-weight:600;color:var(--text2);margin-bottom:4px;">Set up Twilio webhook:</div>
+        <div>1. <a href="https://console.twilio.com" target="_blank" style="color:var(--indigo);">console.twilio.com</a> → copy SID + Auth Token</div>
+        <div>2. Phone Numbers → your number → Messaging webhook (HTTP POST):</div>
+        <div style="background:var(--bg);border-radius:6px;padding:8px 10px;margin-top:6px;font-family:monospace;font-size:11px;color:var(--indigo);word-break:break-all;">${API}/webhooks/twilio/sms</div>
       </div>
-      <div class="space-y-2 mb-3">
-        <div><label class="field-label">Account SID</label>
-          <input id="t-sid"   class="input text-xs" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" value="${a.twilio_sid||''}"/></div>
-        <div><label class="field-label">Auth Token</label>
-          <input id="t-token" class="input text-xs" type="password" placeholder="Your Twilio auth token"/></div>
-        <div><label class="field-label">Phone Number (E.164 format)</label>
-          <input id="t-phone" class="input text-xs" placeholder="+15550001234" value="${a.twilio_phone||''}"/>
-          <p class="text-xs text-gray-500 mt-1">This is the number clients will receive calls and texts from.</p>
-        </div>
-      </div>
-      <div class="bg-gray-800 rounded-xl p-3 text-xs text-gray-400 mb-3 space-y-1">
-        <p class="font-semibold text-gray-300">How to get Twilio credentials:</p>
-        <p>1. Go to <a href="https://console.twilio.com" target="_blank" class="text-indigo-400 underline">console.twilio.com</a> → copy your Account SID and Auth Token</p>
-        <p>2. Buy a US phone number: Phone Numbers → Manage → Buy a Number</p>
-        <p>3. Set the Messaging webhook on that number to:</p>
-        <div class="bg-gray-900 rounded-lg px-2 py-1.5 font-mono text-indigo-300 break-all text-xs mt-1">${API}/webhooks/twilio/sms</div>
-      </div>
-      <button onclick="saveTwilio()" class="btn btn-primary w-full text-xs py-2">Save Twilio</button>
+      <button onclick="saveTwilio()" class="btn btn-primary btn-full">Save Twilio</button>
     </div>
 
     <!-- Gmail -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-sm font-semibold">📧 Gmail — Email alerts</p>
-        <span class="text-xs font-semibold ${a.has_gmail?'text-green-400':'text-gray-500'}">${a.has_gmail?'✅ Connected':'○ Optional'}</span>
-      </div>
-      <div class="space-y-2 mb-3">
-        <div><label class="field-label">Gmail address</label>
-          <input id="g-user" class="input text-xs" type="email" placeholder="you@gmail.com" value="${a.gmail_user||''}"/></div>
-        <div><label class="field-label">App Password (16 characters)</label>
-          <input id="g-pass" class="input text-xs" type="password" placeholder="xxxx xxxx xxxx xxxx"/></div>
-      </div>
-      <div class="bg-gray-800 rounded-xl p-3 text-xs text-gray-400 mb-3 space-y-1">
-        <p class="font-semibold text-gray-300">Create a Gmail App Password:</p>
-        <p>1. Google Account → Security → enable 2-Step Verification</p>
-        <p>2. Search "App passwords" → create one named "ZilloAgent"</p>
-        <p>3. Paste the 16-character code above</p>
-      </div>
-      <button onclick="saveGmail()" class="btn btn-primary w-full text-xs py-2">Save Gmail</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Gmail — Alerts</div>
+      <span style="font-size:11px;font-weight:700;color:${a.has_gmail?'var(--green)':'var(--text3)'};">${a.has_gmail?'● Connected':'○ Optional'}</span>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="field"><label>Gmail address</label><input id="g-user" class="input" type="email" placeholder="you@gmail.com" value="${a.gmail_user||''}"/></div>
+      <div class="field" style="margin-bottom:14px;"><label>App Password</label><input id="g-pass" class="input" type="password" placeholder="16-character app password"/><div class="hint">Google Account → Security → App passwords → create "ZilloAgent"</div></div>
+      <button onclick="saveGmail()" class="btn btn-primary btn-full">Save Gmail</button>
     </div>
 
     <!-- Bland.ai -->
-    <div class="card p-4 mb-4">
-      <div class="flex items-center justify-between mb-3">
-        <p class="text-sm font-semibold">📞 Bland.ai — AI Voice Calls</p>
-        <span class="text-xs font-semibold ${a.has_bland?'text-green-400':'text-gray-500'}">${a.has_bland?'✅ Own key':'Uses shared key'}</span>
-      </div>
-      <div><label class="field-label">Bland.ai API Key (optional)</label>
-        <input id="b-key" class="input text-xs" type="password" placeholder="Your Bland.ai API key"/></div>
-      <p class="text-xs text-gray-500 mt-2 mb-3">Leave empty to use the shared key. Add your own for higher call limits.</p>
-      <button onclick="saveBland()" class="btn btn-secondary w-full text-xs py-2">Save Bland.ai Key</button>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Bland.ai — AI Calls</div>
+      <span style="font-size:11px;font-weight:700;color:${a.has_bland?'var(--green)':'var(--text3)'};">${a.has_bland?'● Own key':'○ Shared key'}</span>
+    </div>
+    <div class="card" style="margin-bottom:20px;">
+      <div class="field" style="margin-bottom:14px;"><label>API Key <span style="font-weight:400;color:var(--text3);">(optional)</span></label><input id="b-key" class="input" type="password" placeholder="Leave empty to use shared key"/></div>
+      <button onclick="saveBland()" class="btn btn-ghost btn-full">Save Bland.ai Key</button>
     </div>
 
     <!-- Test -->
-    <div class="card p-4 mb-4">
-      <p class="text-sm font-semibold mb-3">🧪 Test Connections</p>
-      <button onclick="testCreds()" class="btn btn-secondary w-full text-xs py-2">Test Twilio + Gmail</button>
-      <div id="test-result" class="mt-3 text-xs space-y-1 hidden"></div>
-    </div>
-
-    <!-- Webhook reference -->
-    <div class="card p-4">
-      <p class="text-sm font-semibold mb-2">🔗 Twilio Webhook URL</p>
-      <p class="text-xs text-gray-500 mb-2">Paste this URL in your Twilio phone number's <strong>Messaging → Webhook (HTTP POST)</strong>:</p>
-      <div class="bg-gray-800 rounded-xl px-3 py-2 text-xs font-mono text-indigo-300 break-all select-all">${API}/webhooks/twilio/sms</div>
+    <div style="font-size:12px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Test Connections</div>
+    <div class="card">
+      <button onclick="testCreds()" class="btn btn-ghost btn-full">Run Connection Test</button>
+      <div id="test-result" style="display:none;margin-top:12px;"></div>
     </div>
   `;
 }
 
-async function saveProfile() {
-  const name    = document.getElementById('p-name').value.trim();
-  const company = document.getElementById('p-company').value.trim();
-  if (!name) { alert('Name is required.'); return; }
-  try {
-    const d = await api('PUT','/auth/credentials',{name,company});
-    agent = d.agent; renderSettings();
-    showToast('Profile saved ✅');
-  } catch(e) { alert('Error: '+e.message); }
+async function saveProfile(){
+  const name=document.getElementById('p-name').value.trim();
+  const co  =document.getElementById('p-company').value.trim();
+  const email=document.getElementById('p-email').value.trim();
+  if(!name){alert('Name is required.'); return;}
+  try{
+    const d=await api('PUT','/auth/credentials',{name,company:co||null,gmail_user:email||null});
+    agent=d.agent; toast('Profile saved ✓'); renderSettings();
+  }catch(e){alert(e.message);}
 }
 
-async function saveTwilio() {
-  const sid   = document.getElementById('t-sid').value.trim();
-  const tok   = document.getElementById('t-token').value.trim();
-  const phone = document.getElementById('t-phone').value.trim();
-  if (!sid||!phone) { alert('Account SID and phone number are required.'); return; }
-  const body = {twilio_sid:sid, twilio_phone:phone};
-  if (tok) body.twilio_token = tok;
-  try {
-    const d = await api('PUT','/auth/credentials',body);
-    agent = d.agent; renderSettings();
-    document.getElementById('setup-banner').classList.add('hidden');
-    showToast('Twilio connected ✅');
-  } catch(e) { alert('Error: '+e.message); }
+async function saveTwilio(){
+  const sid=document.getElementById('t-sid').value.trim();
+  const tok=document.getElementById('t-token').value.trim();
+  const ph =document.getElementById('t-phone').value.trim();
+  if(!sid||!ph){alert('Account SID and phone are required.'); return;}
+  const body={twilio_sid:sid,twilio_phone:ph}; if(tok) body.twilio_token=tok;
+  try{
+    const d=await api('PUT','/auth/credentials',body);
+    agent=d.agent; document.getElementById('setup-banner').style.display='none';
+    toast('Twilio connected ✓'); renderSettings();
+  }catch(e){alert(e.message);}
 }
 
-async function saveGmail() {
-  const user = document.getElementById('g-user').value.trim();
-  const pass = document.getElementById('g-pass').value.trim();
-  if (!user) { alert('Gmail address is required.'); return; }
-  const body = {gmail_user:user};
-  if (pass) body.gmail_password = pass;
-  try {
-    const d = await api('PUT','/auth/credentials',body);
-    agent = d.agent; renderSettings();
-    showToast('Gmail connected ✅');
-  } catch(e) { alert('Error: '+e.message); }
+async function saveGmail(){
+  const u=document.getElementById('g-user').value.trim();
+  const p=document.getElementById('g-pass').value.trim();
+  if(!u){alert('Gmail address is required.'); return;}
+  const body={gmail_user:u}; if(p) body.gmail_password=p;
+  try{
+    const d=await api('PUT','/auth/credentials',body);
+    agent=d.agent; toast('Gmail connected ✓'); renderSettings();
+  }catch(e){alert(e.message);}
 }
 
-async function saveBland() {
-  const key = document.getElementById('b-key').value.trim();
-  if (!key) { alert('Enter your Bland.ai API key.'); return; }
-  try {
-    const d = await api('PUT','/auth/credentials',{bland_key:key});
-    agent = d.agent; renderSettings();
-    showToast('Bland.ai key saved ✅');
-  } catch(e) { alert('Error: '+e.message); }
+async function saveBland(){
+  const k=document.getElementById('b-key').value.trim();
+  if(!k){alert('Enter your Bland.ai key.'); return;}
+  try{
+    const d=await api('PUT','/auth/credentials',{bland_key:k});
+    agent=d.agent; toast('Bland.ai key saved ✓'); renderSettings();
+  }catch(e){alert(e.message);}
 }
 
-async function testCreds() {
-  const el = document.getElementById('test-result');
-  el.innerHTML='<p class="text-gray-400 animate-pulse">Testing connections...</p>'; el.classList.remove('hidden');
-  try {
-    const r = await api('POST','/auth/test-credentials');
-    el.innerHTML = Object.entries(r).map(([k,v])=>`
-      <div class="flex justify-between items-center border-b border-gray-800 py-1">
-        <span class="text-gray-400 capitalize">${k}</span>
-        <span class="${String(v).startsWith('✅')?'text-green-400':String(v).startsWith('⚠')?'text-yellow-400':'text-red-400'}">${v}</span>
+async function testCreds(){
+  const el=document.getElementById('test-result');
+  el.innerHTML='<div style="font-size:12px;color:var(--text3);">Testing…</div>'; el.style.display='';
+  try{
+    const r=await api('POST','/auth/test-credentials');
+    el.innerHTML=Object.entries(r).map(([k,v])=>`
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px;">
+        <span style="color:var(--text2);font-weight:500;text-transform:capitalize;">${k}</span>
+        <span style="font-weight:600;color:${String(v).startsWith('✅')?'var(--green)':String(v).startsWith('⚠')?'var(--orange)':'var(--red);'};">${v}</span>
       </div>`).join('');
-  } catch(e) { el.innerHTML=`<p class="text-red-400">${e.message}</p>`; }
+  }catch(e){el.innerHTML=`<div style="font-size:12px;color:var(--red);">${e.message}</div>`;}
 }
 
-function showToast(msg) {
-  const t = document.createElement('div');
-  t.className = 'fixed top-4 left-1/2 -translate-x-1/2 bg-green-900 text-green-300 text-sm font-medium px-4 py-2 rounded-xl z-50 shadow-lg';
-  t.textContent = msg;
-  document.body.appendChild(t);
-  setTimeout(()=>t.remove(), 2500);
+function toast(msg){
+  const t=document.createElement('div'); t.className='toast'; t.textContent=msg;
+  document.body.appendChild(t); setTimeout(()=>t.remove(),2200);
 }
 
-// Update /auth/credentials to also accept name/company
-// (backend already supports this via CredentialsUpdate — we'll add it)
-
-// Auto-refresh home stats every 30s
+// Auto-refresh home every 30s
 setInterval(()=>{
-  if(token && !document.getElementById('page-home').classList.contains('hidden')) renderHome();
+  if(token && document.getElementById('page-home').style.display!=='none') renderHome();
 },30000);
 </script>
 </body>
