@@ -67,16 +67,11 @@ def get_db():
 # Pydantic schemas
 # ======================================================================
 
-class SignupRequest(BaseModel):
-    name: str
+class PhoneAuthRequest(BaseModel):
+    phone: str
+    name: Optional[str] = None      # only needed for new accounts
     company: Optional[str] = None
-    phone: str                      # required — outbound call/SMS number
-    email: Optional[str] = None     # optional
-    password: str
-
-class LoginRequest(BaseModel):
-    identifier: str   # phone number OR email
-    password: str
+    email: Optional[str] = None
 
 class CredentialsUpdate(BaseModel):
     name: Optional[str] = None
@@ -119,51 +114,55 @@ def health():
 # Auth
 # ======================================================================
 
-@app.post("/auth/signup")
-def signup(req: SignupRequest, db: Session = Depends(get_db)):
-    # Normalize phone
-    digits = "".join(c for c in req.phone if c.isdigit())
+def _normalize_phone(raw: str) -> str:
+    digits = "".join(c for c in raw if c.isdigit())
     if len(digits) == 10:
         digits = "1" + digits
-    phone_e164 = "+" + digits
+    return "+" + digits
 
-    # Check uniqueness
-    if db.query(Agent).filter(Agent.phone == phone_e164).first():
-        raise HTTPException(400, "Phone number already registered")
-    if req.email:
-        if db.query(Agent).filter(Agent.email == req.email.lower()).first():
-            raise HTTPException(400, "Email already registered")
+
+@app.post("/auth/enter")
+def phone_enter(req: PhoneAuthRequest, db: Session = Depends(get_db)):
+    """
+    Single endpoint: enter with phone only.
+    - Existing account → return token immediately.
+    - New phone → create account (name required) → return token.
+    """
+    phone = _normalize_phone(req.phone)
+    agent = db.query(Agent).filter(Agent.phone == phone).first()
+
+    if agent:
+        # Existing user — just log in
+        return {"token": create_token(agent.id), "agent": _agent_dict(agent), "new": False}
+
+    # New user — name is required
+    if not req.name or not req.name.strip():
+        raise HTTPException(400, "new_user")   # frontend shows name form
 
     agent = Agent(
-        name=req.name,
+        name=req.name.strip(),
         company=req.company,
-        phone=phone_e164,
+        phone=phone,
         email=req.email.lower() if req.email else None,
-        password_hash=hash_password(req.password),
-        twilio_phone=phone_e164,   # outbound number = their own phone
+        password_hash="",          # no password
+        twilio_phone=phone,
         daily_sms_limit=350,
         daily_call_limit=20,
     )
     db.add(agent)
     db.commit()
     db.refresh(agent)
-    return {"token": create_token(agent.id), "agent": _agent_dict(agent)}
+    return {"token": create_token(agent.id), "agent": _agent_dict(agent), "new": True}
 
+
+# Keep old endpoints alive so existing tokens still work
+@app.post("/auth/signup")
+def signup_compat(req: PhoneAuthRequest, db: Session = Depends(get_db)):
+    return phone_enter(req, db)
 
 @app.post("/auth/login")
-def login(req: LoginRequest, db: Session = Depends(get_db)):
-    # Login by phone number or email
-    identifier = req.identifier.strip()
-    agent = None
-    if identifier.startswith("+") or identifier.replace("-","").replace(" ","").replace("(","").replace(")","").isdigit():
-        digits = "".join(c for c in identifier if c.isdigit())
-        if len(digits) == 10: digits = "1" + digits
-        agent = db.query(Agent).filter(Agent.phone == "+" + digits).first()
-    if not agent:
-        agent = db.query(Agent).filter(Agent.email == identifier.lower()).first()
-    if not agent or not verify_password(req.password, agent.password_hash):
-        raise HTTPException(401, "Invalid phone/email or password")
-    return {"token": create_token(agent.id), "agent": _agent_dict(agent)}
+def login_compat(req: PhoneAuthRequest, db: Session = Depends(get_db)):
+    return phone_enter(req, db)
 
 
 @app.get("/auth/me")

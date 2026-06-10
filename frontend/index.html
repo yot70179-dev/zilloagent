@@ -122,7 +122,7 @@ textarea.input{resize:none;}
 <div id="auth-screen" class="auth-wrap">
   <div class="auth-box">
 
-    <div style="display:flex;align-items:center;gap:12px;margin-bottom:32px;">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:36px;">
       <div class="logo-mark">Z</div>
       <div>
         <div style="font-weight:700;font-size:18px;letter-spacing:-.3px;">ZilloAgent</div>
@@ -130,71 +130,45 @@ textarea.input{resize:none;}
       </div>
     </div>
 
-    <!-- Login -->
-    <div id="login-form" class="card">
-      <div style="margin-bottom:22px;">
-        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Welcome back</div>
-        <div style="font-size:13px;color:var(--text3);">Sign in with your phone number or email</div>
+    <!-- Step 1: Phone entry -->
+    <div id="phone-step" class="card">
+      <div style="margin-bottom:24px;">
+        <div style="font-size:20px;font-weight:700;margin-bottom:6px;">Enter your phone number</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.5;">Your number is your account. New here? We'll set you up in seconds.</div>
       </div>
       <div class="field">
-        <label>Phone number or email</label>
-        <input id="login-identifier" class="input" type="text" placeholder="+1 (555) 000-0000"/>
+        <label>Mobile number</label>
+        <input id="auth-phone" class="input" type="tel" placeholder="+1 (555) 000-0000" style="font-size:16px;padding:13px 14px;"
+          onkeydown="if(event.key==='Enter')phoneNext()"/>
       </div>
-      <div class="field">
-        <label>Password</label>
-        <input id="login-password" class="input" type="password" placeholder="••••••••"/>
-      </div>
-      <div id="login-error" style="display:none;background:var(--red-dim);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;border:1px solid #3d1010;"></div>
-      <button onclick="doLogin()" class="btn btn-primary btn-full" style="margin-top:4px;">Sign in</button>
-      <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text3);">
-        New here? <button onclick="showSignup()" style="background:none;border:none;color:var(--indigo);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;">Create a free account →</button>
-      </div>
+      <div id="phone-error" style="display:none;background:var(--red-dim);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;border:1px solid #3d1010;"></div>
+      <button onclick="phoneNext()" id="phone-btn" class="btn btn-primary btn-full" style="height:46px;font-size:15px;">Continue →</button>
     </div>
 
-    <!-- Signup -->
-    <div id="signup-form" class="card" style="display:none;">
-      <div style="margin-bottom:22px;">
-        <div style="font-size:18px;font-weight:700;margin-bottom:4px;">Create your account</div>
-        <div style="font-size:13px;color:var(--text3);">Your phone number will be used to call and text clients</div>
+    <!-- Step 2: Name entry (new users only) -->
+    <div id="name-step" class="card" style="display:none;">
+      <div style="margin-bottom:24px;">
+        <div style="font-size:20px;font-weight:700;margin-bottom:6px;">One last thing</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.5;">Tell us a bit about yourself to finish setting up your account.</div>
       </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="field">
-          <label>Full name <span style="color:var(--red)">*</span></label>
-          <input id="su-name" class="input" type="text" placeholder="John Smith"/>
-        </div>
-        <div class="field">
-          <label>Company name</label>
-          <input id="su-company" class="input" type="text" placeholder="Smith Realty"/>
-        </div>
-      </div>
-
       <div class="field">
-        <label>Phone number <span style="color:var(--red)">*</span></label>
-        <input id="su-phone" class="input" type="tel" placeholder="+1 (555) 000-0000"/>
-        <div class="hint">Clients will receive calls & texts from this number. Used to sign in.</div>
+        <label>Full name <span style="color:var(--red)">*</span></label>
+        <input id="auth-name" class="input" type="text" placeholder="John Smith"
+          onkeydown="if(event.key==='Enter')nameNext()"/>
       </div>
-
       <div class="field">
-        <label>Email address <span style="color:var(--text3);font-weight:400;">(optional — for alerts)</span></label>
-        <input id="su-email" class="input" type="email" placeholder="you@example.com"/>
+        <label>Company name <span style="color:var(--text3);font-weight:400;">(optional)</span></label>
+        <input id="auth-company" class="input" type="text" placeholder="Smith Realty"/>
       </div>
-
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-        <div class="field">
-          <label>Password <span style="color:var(--red)">*</span></label>
-          <input id="su-password" class="input" type="password" placeholder="Min 6 chars"/>
-        </div>
-        <div class="field">
-          <label>Confirm password <span style="color:var(--red)">*</span></label>
-          <input id="su-confirm" class="input" type="password" placeholder="Re-enter"/>
-        </div>
+      <div class="field">
+        <label>Email <span style="color:var(--text3);font-weight:400;">(optional — for alerts)</span></label>
+        <input id="auth-email" class="input" type="email" placeholder="you@example.com"/>
       </div>
-
-      <div id="signup-error" style="display:none;background:var(--red-dim);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;border:1px solid #3d1010;"></div>
-      <button onclick="doSignup()" class="btn btn-primary btn-full">Create account</button>
-      <div style="text-align:center;margin-top:18px;font-size:13px;color:var(--text3);">
-        Already have an account? <button onclick="showLogin()" style="background:none;border:none;color:var(--indigo);font-weight:600;cursor:pointer;font-size:13px;font-family:inherit;">Sign in →</button>
+      <div id="name-error" style="display:none;background:var(--red-dim);color:var(--red);font-size:12px;padding:10px 12px;border-radius:var(--radius-sm);margin-bottom:14px;border:1px solid #3d1010;"></div>
+      <button onclick="nameNext()" class="btn btn-primary btn-full" style="height:46px;font-size:15px;">Create account →</button>
+      <div style="text-align:center;margin-top:16px;">
+        <button onclick="document.getElementById('name-step').style.display='none';document.getElementById('phone-step').style.display='';"
+          style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;font-family:inherit;">← Back</button>
       </div>
     </div>
 
@@ -260,9 +234,6 @@ async function api(method, path, body) {
 }
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
-function showLogin()  { document.getElementById('signup-form').style.display='none'; document.getElementById('login-form').style.display=''; }
-function showSignup() { document.getElementById('login-form').style.display='none';  document.getElementById('signup-form').style.display=''; }
-
 function showErr(id,msg){ const e=document.getElementById(id); e.textContent=msg; e.style.display=''; }
 function hideErr(id)    { document.getElementById(id).style.display='none'; }
 
@@ -273,41 +244,53 @@ function normPhone(p){
   return '+'+d;
 }
 
-async function doLogin(){
-  hideErr('login-error');
-  const id  = document.getElementById('login-identifier').value.trim();
-  const pw  = document.getElementById('login-password').value;
-  if(!id||!pw){showErr('login-error','Please enter your phone number and password.'); return;}
+let _pendingPhone = '';
+
+async function phoneNext(){
+  hideErr('phone-error');
+  const raw = document.getElementById('auth-phone').value.trim();
+  if(!raw){showErr('phone-error','Please enter your phone number.'); return;}
+  const phone = normPhone(raw);
+  if(phone.length < 10){showErr('phone-error','Enter a valid US phone number.'); return;}
+  const btn = document.getElementById('phone-btn');
+  btn.disabled=true; btn.textContent='Checking…';
   try{
-    const d = await api('POST','/auth/login',{identifier:id,password:pw});
+    const d = await api('POST','/auth/enter',{phone});
     token=d.token; agent=d.agent; localStorage.setItem('za_token',token); enterApp();
-  }catch(e){showErr('login-error',e.message);}
+  }catch(e){
+    if(e.message==='new_user'){
+      // New account — show name step
+      _pendingPhone = phone;
+      document.getElementById('phone-step').style.display='none';
+      document.getElementById('name-step').style.display='';
+      setTimeout(()=>document.getElementById('auth-name').focus(),80);
+    } else {
+      showErr('phone-error', e.message);
+    }
+  } finally {
+    btn.disabled=false; btn.textContent='Continue →';
+  }
 }
 
-async function doSignup(){
-  hideErr('signup-error');
-  const name   = document.getElementById('su-name').value.trim();
-  const co     = document.getElementById('su-company').value.trim();
-  const phone  = document.getElementById('su-phone').value.trim();
-  const email  = document.getElementById('su-email').value.trim();
-  const pw     = document.getElementById('su-password').value;
-  const pw2    = document.getElementById('su-confirm').value;
-  if(!name)    {showErr('signup-error','Full name is required.'); return;}
-  if(!phone)   {showErr('signup-error','Phone number is required.'); return;}
-  if(!pw)      {showErr('signup-error','Password is required.'); return;}
-  if(pw.length<6){showErr('signup-error','Password must be at least 6 characters.'); return;}
-  if(pw!==pw2) {showErr('signup-error','Passwords do not match.'); return;}
+async function nameNext(){
+  hideErr('name-error');
+  const name    = document.getElementById('auth-name').value.trim();
+  const company = document.getElementById('auth-company').value.trim();
+  const email   = document.getElementById('auth-email').value.trim();
+  if(!name){showErr('name-error','Your name is required.'); return;}
   try{
-    const d = await api('POST','/auth/signup',{name,company:co||null,phone:normPhone(phone),email:email||null,password:pw});
+    const d = await api('POST','/auth/enter',{phone:_pendingPhone, name, company:company||null, email:email||null});
     token=d.token; agent=d.agent; localStorage.setItem('za_token',token); enterApp();
-  }catch(e){showErr('signup-error',e.message);}
+  }catch(e){showErr('name-error',e.message);}
 }
 
 function doLogout(){
-  localStorage.removeItem('za_token'); token=null; agent=null;
+  localStorage.removeItem('za_token'); token=null; agent=null; _pendingPhone='';
   document.getElementById('app-screen').style.display='none';
+  document.getElementById('name-step').style.display='none';
+  document.getElementById('phone-step').style.display='';
+  document.getElementById('auth-phone').value='';
   document.getElementById('auth-screen').style.display='';
-  showLogin();
 }
 
 async function enterApp(){
