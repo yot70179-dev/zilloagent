@@ -46,6 +46,7 @@ class Agent(Base):
 
     id            = Column(Integer, primary_key=True)
     name          = Column(String(200), nullable=False)
+    company       = Column(String(200), nullable=True)
     email         = Column(String(200), unique=True, nullable=False)
     password_hash = Column(String(200), nullable=False)
 

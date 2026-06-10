@@ -69,7 +69,9 @@ def get_db():
 
 class SignupRequest(BaseModel):
     name: str
+    company: Optional[str] = None
     email: str
+    phone: Optional[str] = None   # agent's own phone (used as Twilio from-number)
     password: str
 
 class LoginRequest(BaseModel):
@@ -77,6 +79,8 @@ class LoginRequest(BaseModel):
     password: str
 
 class CredentialsUpdate(BaseModel):
+    name: Optional[str] = None
+    company: Optional[str] = None
     twilio_sid: Optional[str] = None
     twilio_token: Optional[str] = None
     twilio_phone: Optional[str] = None
@@ -123,6 +127,8 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
         name=req.name,
         email=req.email.lower(),
         password_hash=hash_password(req.password),
+        company=req.company,
+        twilio_phone=req.phone,   # pre-fill their phone as the outbound number
     )
     db.add(agent)
     db.commit()
@@ -193,11 +199,13 @@ def _agent_dict(agent: Agent) -> dict:
     return {
         "id": agent.id,
         "name": agent.name,
+        "company": getattr(agent, "company", None),
         "email": agent.email,
         "has_twilio": bool(agent.twilio_sid and agent.twilio_token and agent.twilio_phone),
         "has_gmail": bool(agent.gmail_user and agent.gmail_password),
         "has_bland": bool(agent.bland_key),
         "twilio_phone": agent.twilio_phone,
+        "twilio_sid": agent.twilio_sid,
         "gmail_user": agent.gmail_user,
         "daily_limit": agent.daily_limit,
         "created_at": agent.created_at.isoformat() if agent.created_at else None,
