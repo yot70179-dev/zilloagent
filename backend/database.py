@@ -47,17 +47,20 @@ class Agent(Base):
     id            = Column(Integer, primary_key=True)
     name          = Column(String(200), nullable=False)
     company       = Column(String(200), nullable=True)
-    email         = Column(String(200), unique=True, nullable=False)
+    email         = Column(String(200), unique=True, nullable=True)   # optional
     password_hash = Column(String(200), nullable=False)
 
-    # Twilio — agent's own numbers
+    # Primary identifier — phone is required, used for login + outbound calls/SMS
+    phone         = Column(String(50), unique=True, nullable=True)
+
+    # Twilio — agent's own credentials (phone above is the outbound number)
     twilio_sid    = Column(String(200), nullable=True)
     twilio_token  = Column(String(200), nullable=True)
-    twilio_phone  = Column(String(50),  nullable=True)   # "+1XXXXXXXXXX"
+    twilio_phone  = Column(String(50),  nullable=True)   # synced from phone on signup
 
-    # Gmail / SMTP — agent's own email
+    # Gmail / SMTP — agent's own email (for hot-lead alerts)
     gmail_user     = Column(String(200), nullable=True)
-    gmail_password = Column(String(200), nullable=True)   # app password
+    gmail_password = Column(String(200), nullable=True)
 
     # Bland.ai — agent's own key (optional; falls back to env)
     bland_key      = Column(String(300), nullable=True)
@@ -65,10 +68,12 @@ class Agent(Base):
     # RapidAPI — agent's own key (optional; falls back to env)
     rapidapi_key   = Column(String(200), nullable=True)
 
-    # Settings
-    daily_limit   = Column(Integer, default=250)
-    is_active     = Column(Boolean, default=True)
-    created_at    = Column(DateTime, default=datetime.utcnow)
+    # Daily limits
+    daily_sms_limit  = Column(Integer, default=350)
+    daily_call_limit = Column(Integer, default=20)
+    daily_limit      = Column(Integer, default=350)   # kept for compatibility
+    is_active        = Column(Boolean, default=True)
+    created_at       = Column(DateTime, default=datetime.utcnow)
 
     campaigns = relationship("Campaign", back_populates="agent")
     leads     = relationship("Lead",     back_populates="agent")

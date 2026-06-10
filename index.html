@@ -49,8 +49,8 @@
       <h2 class="text-lg font-semibold mb-5">Sign in to your account</h2>
       <div class="space-y-3">
         <div>
-          <label class="field-label">Email address</label>
-          <input id="login-email" class="input" type="email" placeholder="you@example.com" autocomplete="email"/>
+          <label class="field-label">Phone number or Email</label>
+          <input id="login-identifier" class="input" type="text" placeholder="+1 (555) 000-0000" autocomplete="username"/>
         </div>
         <div>
           <label class="field-label">Password</label>
@@ -80,13 +80,13 @@
           </div>
         </div>
         <div>
-          <label class="field-label">Email address <span class="text-red-400">*</span></label>
-          <input id="su-email"   class="input" type="email" placeholder="you@example.com"/>
+          <label class="field-label">Your phone number <span class="text-red-400">*</span></label>
+          <input id="su-phone" class="input" type="tel" placeholder="+1 (555) 000-0000"/>
+          <p class="text-xs text-gray-500 mt-1">Clients will receive calls &amp; texts from this number. Also used to sign in.</p>
         </div>
         <div>
-          <label class="field-label">Your phone number <span class="text-red-400">*</span></label>
-          <input id="su-phone"   class="input" type="tel"   placeholder="+1 (555) 000-0000"/>
-          <p class="text-xs text-gray-500 mt-1">This is the number clients will see when you call or text them.</p>
+          <label class="field-label">Email address <span class="text-gray-500">(optional)</span></label>
+          <input id="su-email" class="input" type="email" placeholder="you@example.com — for hot-lead alerts"/>
         </div>
         <div>
           <label class="field-label">Password <span class="text-red-400">*</span></label>
@@ -193,11 +193,11 @@ function normalizePhone(p) {
 
 async function doLogin() {
   hideErr('login-error');
-  const email = document.getElementById('login-email').value.trim();
-  const pass  = document.getElementById('login-password').value;
-  if (!email||!pass) { showErr('login-error','Please enter your email and password.'); return; }
+  const identifier = document.getElementById('login-identifier').value.trim();
+  const pass       = document.getElementById('login-password').value;
+  if (!identifier||!pass) { showErr('login-error','Please enter your phone number (or email) and password.'); return; }
   try {
-    const d = await api('POST','/auth/login',{email,password:pass});
+    const d = await api('POST','/auth/login',{identifier, password:pass});
     token = d.token; agent = d.agent;
     localStorage.setItem('za_token', token);
     enterApp();
@@ -208,19 +208,20 @@ async function doSignup() {
   hideErr('signup-error');
   const name    = document.getElementById('su-name').value.trim();
   const company = document.getElementById('su-company').value.trim();
-  const email   = document.getElementById('su-email').value.trim();
   const phone   = document.getElementById('su-phone').value.trim();
+  const email   = document.getElementById('su-email').value.trim();
   const pass    = document.getElementById('su-password').value;
   const confirm = document.getElementById('su-confirm').value;
   if (!name)  { showErr('signup-error','Full name is required.'); return; }
-  if (!email) { showErr('signup-error','Email address is required.'); return; }
-  if (!phone) { showErr('signup-error','Phone number is required — this is the number clients will receive calls and texts from.'); return; }
+  if (!phone) { showErr('signup-error','Phone number is required — clients will call and text from this number.'); return; }
   if (!pass)  { showErr('signup-error','Password is required.'); return; }
   if (pass.length < 6) { showErr('signup-error','Password must be at least 6 characters.'); return; }
   if (pass !== confirm) { showErr('signup-error','Passwords do not match.'); return; }
-  const normalizedPhone = normalizePhone(phone);
   try {
-    const d = await api('POST','/auth/signup',{name, company, email, phone: normalizedPhone, password: pass});
+    const d = await api('POST','/auth/signup',{
+      name, company: company||null, phone: normalizePhone(phone),
+      email: email||null, password: pass
+    });
     token = d.token; agent = d.agent;
     localStorage.setItem('za_token', token);
     enterApp();
@@ -299,6 +300,13 @@ async function renderHome() {
           </div>
         </div>
       </div>
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-3">Today's Usage</p>
+        <div class="space-y-3">
+          ${usageBar('📱 SMS', s.sms_today??0, s.sms_limit??350)}
+          ${usageBar('📞 Calls', s.calls_today??0, s.call_limit??20)}
+        </div>
+      </div>
       <button onclick="showPage('outreach')" class="btn btn-primary w-full mb-3">🚀 Start New Outreach Campaign</button>
       <button onclick="showPage('inbox')"    class="btn btn-secondary w-full">💬 View All Leads →</button>
     `;
@@ -309,6 +317,22 @@ async function renderHome() {
 
 function sc(label, val, cls) {
   return `<div class="card p-4"><p class="text-xs text-gray-500 mb-1">${label}</p><p class="text-3xl font-bold ${cls}">${val}</p></div>`;
+}
+
+function usageBar(label, used, limit) {
+  const pct  = Math.min(100, Math.round(used / limit * 100));
+  const left = limit - used;
+  const color = pct >= 90 ? 'bg-red-500' : pct >= 70 ? 'bg-yellow-500' : 'bg-indigo-500';
+  return `
+    <div>
+      <div class="flex justify-between text-xs mb-1">
+        <span class="text-gray-300 font-medium">${label}</span>
+        <span class="text-gray-400">${used} / ${limit} <span class="text-gray-600">· ${left} left</span></span>
+      </div>
+      <div class="h-2 bg-gray-800 rounded-full overflow-hidden">
+        <div class="${color} h-2 rounded-full transition-all" style="width:${pct}%"></div>
+      </div>
+    </div>`;
 }
 
 // ── INBOX ─────────────────────────────────────────────────────────────────────

@@ -70,12 +70,12 @@ def get_db():
 class SignupRequest(BaseModel):
     name: str
     company: Optional[str] = None
-    email: str
-    phone: Optional[str] = None   # agent's own phone (used as Twilio from-number)
+    phone: str                      # required — outbound call/SMS number
+    email: Optional[str] = None     # optional
     password: str
 
 class LoginRequest(BaseModel):
-    email: str
+    identifier: str   # phone number OR email
     password: str
 
 class CredentialsUpdate(BaseModel):
@@ -121,14 +121,28 @@ def health():
 
 @app.post("/auth/signup")
 def signup(req: SignupRequest, db: Session = Depends(get_db)):
-    if db.query(Agent).filter(Agent.email == req.email.lower()).first():
-        raise HTTPException(400, "Email already registered")
+    # Normalize phone
+    digits = "".join(c for c in req.phone if c.isdigit())
+    if len(digits) == 10:
+        digits = "1" + digits
+    phone_e164 = "+" + digits
+
+    # Check uniqueness
+    if db.query(Agent).filter(Agent.phone == phone_e164).first():
+        raise HTTPException(400, "Phone number already registered")
+    if req.email:
+        if db.query(Agent).filter(Agent.email == req.email.lower()).first():
+            raise HTTPException(400, "Email already registered")
+
     agent = Agent(
         name=req.name,
-        email=req.email.lower(),
-        password_hash=hash_password(req.password),
         company=req.company,
-        twilio_phone=req.phone,   # pre-fill their phone as the outbound number
+        phone=phone_e164,
+        email=req.email.lower() if req.email else None,
+        password_hash=hash_password(req.password),
+        twilio_phone=phone_e164,   # outbound number = their own phone
+        daily_sms_limit=350,
+        daily_call_limit=20,
     )
     db.add(agent)
     db.commit()
@@ -138,9 +152,17 @@ def signup(req: SignupRequest, db: Session = Depends(get_db)):
 
 @app.post("/auth/login")
 def login(req: LoginRequest, db: Session = Depends(get_db)):
-    agent = db.query(Agent).filter(Agent.email == req.email.lower()).first()
+    # Login by phone number or email
+    identifier = req.identifier.strip()
+    agent = None
+    if identifier.startswith("+") or identifier.replace("-","").replace(" ","").replace("(","").replace(")","").isdigit():
+        digits = "".join(c for c in identifier if c.isdigit())
+        if len(digits) == 10: digits = "1" + digits
+        agent = db.query(Agent).filter(Agent.phone == "+" + digits).first()
+    if not agent:
+        agent = db.query(Agent).filter(Agent.email == identifier.lower()).first()
     if not agent or not verify_password(req.password, agent.password_hash):
-        raise HTTPException(401, "Invalid email or password")
+        raise HTTPException(401, "Invalid phone/email or password")
     return {"token": create_token(agent.id), "agent": _agent_dict(agent)}
 
 
@@ -199,17 +221,43 @@ def _agent_dict(agent: Agent) -> dict:
     return {
         "id": agent.id,
         "name": agent.name,
-        "company": getattr(agent, "company", None),
+        "company": agent.company,
         "email": agent.email,
+        "phone": agent.phone,
         "has_twilio": bool(agent.twilio_sid and agent.twilio_token and agent.twilio_phone),
-        "has_gmail": bool(agent.gmail_user and agent.gmail_password),
-        "has_bland": bool(agent.bland_key),
+        "has_gmail":  bool(agent.gmail_user and agent.gmail_password),
+        "has_bland":  bool(agent.bland_key),
         "twilio_phone": agent.twilio_phone,
-        "twilio_sid": agent.twilio_sid,
-        "gmail_user": agent.gmail_user,
-        "daily_limit": agent.daily_limit,
+        "twilio_sid":   agent.twilio_sid,
+        "gmail_user":   agent.gmail_user,
+        "daily_sms_limit":  getattr(agent, "daily_sms_limit",  350),
+        "daily_call_limit": getattr(agent, "daily_call_limit", 20),
         "created_at": agent.created_at.isoformat() if agent.created_at else None,
     }
+
+
+def _daily_usage(agent_id: int, db: Session) -> dict:
+    """Return today's SMS and call counts for an agent."""
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    msgs = (
+        db.query(Message)
+        .join(Lead, Message.lead_id == Lead.id)
+        .filter(Lead.agent_id == agent_id,
+                Message.direction == "outbound",
+                Message.message_type == "sms",
+                Message.sent_at >= today)
+        .count()
+    )
+    calls = (
+        db.query(Message)
+        .join(Lead, Message.lead_id == Lead.id)
+        .filter(Lead.agent_id == agent_id,
+                Message.direction == "outbound",
+                Message.message_type == "call",
+                Message.sent_at >= today)
+        .count()
+    )
+    return {"sms": msgs, "calls": calls}
 
 
 # ======================================================================
@@ -238,6 +286,7 @@ def stats_today(
 
     response_rate = round((responded / total_leads * 100), 1) if total_leads else 0
 
+    usage = _daily_usage(agent.id, db)
     return {
         "total_leads": total_leads,
         "messages_sent_today": msgs_today,
@@ -246,6 +295,10 @@ def stats_today(
         "opted_out": opted_out,
         "hot_leads": hot_leads,
         "response_rate": response_rate,
+        "sms_today": usage["sms"],
+        "calls_today": usage["calls"],
+        "sms_limit": getattr(agent, "daily_sms_limit", 350),
+        "call_limit": getattr(agent, "daily_call_limit", 20),
     }
 
 
@@ -366,10 +419,17 @@ def _run_outreach_task(agent_id: int, target_area: str, limit: int):
 
         resp = httpx.get(url, headers=headers, timeout=20)
         listings = resp.json().get("listings", [])
+        # Check daily SMS limit before sending
+        usage = _daily_usage(agent_id, db)
+        sms_remaining = max(0, getattr(agent, "daily_sms_limit", 350) - usage["sms"])
+        if sms_remaining == 0:
+            logger.info("Agent %d hit daily SMS limit (%d)", agent_id, getattr(agent, "daily_sms_limit", 350))
+            return
+
         sent = 0
 
         for listing in listings:
-            if sent >= limit:
+            if sent >= limit or sent >= sms_remaining:
                 break
             adv = next((a for a in listing.get("advertisers", []) if a.get("type") == "seller"), None)
             if not adv:
@@ -519,6 +579,13 @@ def _make_consent_call(lead_id: int, agent_id: int):
         lead  = db.query(Lead).filter(Lead.id == lead_id).first()
         agent = db.query(Agent).filter(Agent.id == agent_id).first()
         if not lead or not agent:
+            return
+
+        # Daily call limit check
+        usage = _daily_usage(agent_id, db)
+        call_limit = getattr(agent, "daily_call_limit", 20)
+        if usage["calls"] >= call_limit:
+            logger.info("Agent %d hit daily call limit (%d)", agent_id, call_limit)
             return
 
         # Time-of-day check (9 AM – 9 PM)
