@@ -1,269 +1,553 @@
 <!DOCTYPE html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1"/>
-<title>ZilloAgent Dashboard</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
+<title>ZilloAgent</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
-  body { font-family:'Inter',sans-serif; background:#0f1117; color:#e2e8f0; }
-  .card { background:#1a1d27; border:1px solid #2d3148; border-radius:16px; }
-  .badge-positive  { background:#065f46; color:#6ee7b7; }
-  .badge-negative  { background:#7f1d1d; color:#fca5a5; }
-  .badge-neutral   { background:#1e3a5f; color:#93c5fd; }
-  .badge-sent      { background:#1e3a5f; color:#93c5fd; }
-  .badge-initiated { background:#3b1f6e; color:#c4b5fd; }
-  .pulse { animation: pulse 2s infinite; }
-  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
-  ::-webkit-scrollbar { width:4px; }
-  ::-webkit-scrollbar-track { background:#1a1d27; }
-  ::-webkit-scrollbar-thumb { background:#4b5563; border-radius:2px; }
+  body{font-family:system-ui,-apple-system,sans-serif;background:#0f1117;color:#e2e8f0;}
+  .card{background:#1a1d27;border:1px solid #2d3148;border-radius:16px;}
+  .input{background:#1a1d27;border:1px solid #3d4168;border-radius:10px;padding:10px 14px;color:#e2e8f0;width:100%;outline:none;font-size:14px;}
+  .input:focus{border-color:#6366f1;}
+  .btn{padding:10px 20px;border-radius:10px;font-weight:600;cursor:pointer;transition:all .15s;font-size:14px;}
+  .btn-primary{background:#6366f1;color:#fff;border:none;}
+  .btn-primary:hover{background:#5557e8;}
+  .btn-secondary{background:#1a1d27;border:1px solid #3d4168;color:#e2e8f0;}
+  .btn-secondary:hover{border-color:#6366f1;}
+  .badge-pending{background:#422006;color:#fb923c;}
+  .badge-consented{background:#052e16;color:#4ade80;}
+  .badge-optedout{background:#450a0a;color:#f87171;}
+  .slide-in{animation:slideIn .18s ease-out;}
+  @keyframes slideIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+  ::-webkit-scrollbar{width:4px;}
+  ::-webkit-scrollbar-track{background:#1a1d27;}
+  ::-webkit-scrollbar-thumb{background:#4b5563;border-radius:2px;}
+  textarea.input{resize:none;}
 </style>
 </head>
-<body class="min-h-screen p-6">
+<body>
 
-<!-- Header -->
-<div class="flex items-center justify-between mb-6">
-  <div class="flex items-center gap-3">
-    <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-lg">Z</div>
-    <div>
-      <h1 class="text-xl font-bold">ZilloAgent</h1>
-      <p class="text-xs text-gray-500">לוח בקרה — LA Real Estate</p>
+<!-- ═══ AUTH ══════════════════════════════════════════════════════════════════ -->
+<div id="auth-screen" class="min-h-screen flex items-center justify-center p-4">
+  <div class="w-full max-w-sm">
+    <!-- Logo -->
+    <div class="flex items-center gap-3 justify-center mb-8">
+      <div class="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center font-bold text-white text-xl">Z</div>
+      <div>
+        <h1 class="text-2xl font-bold">ZilloAgent</h1>
+        <p class="text-xs text-gray-500">AI Real Estate Outreach</p>
+      </div>
+    </div>
+
+    <!-- Login -->
+    <div id="login-form" class="card p-6">
+      <h2 class="text-lg font-semibold mb-5">Sign in</h2>
+      <div class="space-y-3">
+        <input id="login-email"    class="input" type="email"    placeholder="Email address" autocomplete="email"/>
+        <input id="login-password" class="input" type="password" placeholder="Password"      autocomplete="current-password"/>
+        <button onclick="doLogin()" class="btn btn-primary w-full">Sign in</button>
+      </div>
+      <p class="text-center text-sm text-gray-500 mt-4">
+        No account? <button onclick="showSignup()" class="text-indigo-400 hover:underline">Create one</button>
+      </p>
+      <div id="login-error" class="text-red-400 text-sm mt-3 hidden"></div>
+    </div>
+
+    <!-- Signup -->
+    <div id="signup-form" class="card p-6 hidden">
+      <h2 class="text-lg font-semibold mb-1">Create account</h2>
+      <p class="text-xs text-gray-500 mb-5">Connect your Twilio & Gmail after signup</p>
+      <div class="space-y-3">
+        <input id="signup-name"     class="input" type="text"     placeholder="Full name"/>
+        <input id="signup-email"    class="input" type="email"    placeholder="Email address"/>
+        <input id="signup-password" class="input" type="password" placeholder="Password (min 6 chars)"/>
+        <button onclick="doSignup()" class="btn btn-primary w-full">Create account</button>
+      </div>
+      <p class="text-center text-sm text-gray-500 mt-4">
+        Have an account? <button onclick="showLogin()" class="text-indigo-400 hover:underline">Sign in</button>
+      </p>
+      <div id="signup-error" class="text-red-400 text-sm mt-3 hidden"></div>
     </div>
   </div>
-  <div class="flex items-center gap-3">
-    <div id="live-dot" class="flex items-center gap-2 text-sm text-green-400">
-      <div class="w-2 h-2 bg-green-400 rounded-full pulse"></div>
-      חי
+</div>
+
+<!-- ═══ APP ════════════════════════════════════════════════════════════════════ -->
+<div id="app-screen" class="hidden min-h-screen pb-16">
+
+  <!-- Top Bar -->
+  <div class="flex items-center justify-between px-4 py-3 border-b border-gray-800 sticky top-0 z-20" style="background:#0f1117;">
+    <div class="flex items-center gap-2">
+      <div class="w-8 h-8 bg-indigo-600 rounded-xl flex items-center justify-center font-bold text-white text-sm">Z</div>
+      <span class="font-semibold text-sm">ZilloAgent</span>
     </div>
-    <button onclick="loadAll()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-sm px-4 py-2 rounded-xl transition">רענן</button>
+    <div class="flex items-center gap-3">
+      <span id="agent-name-badge" class="text-xs text-gray-400 truncate max-w-24"></span>
+      <button onclick="doLogout()" class="text-xs text-gray-500 hover:text-white">Sign out</button>
+    </div>
   </div>
-</div>
 
-<!-- Stats -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-  <div class="card p-5">
-    <p class="text-xs text-gray-500 mb-1">אימיילים נשלחו</p>
-    <p class="text-3xl font-bold text-blue-400" id="stat-emails">—</p>
+  <!-- Setup Banner -->
+  <div id="setup-banner" class="hidden mx-4 mt-3 bg-yellow-900 border border-yellow-700 rounded-xl p-3 text-sm">
+    ⚠️ Connect your Twilio & Gmail to send outreach.
+    <button onclick="showPage('settings')" class="underline font-semibold ml-1">Set up now →</button>
   </div>
-  <div class="card p-5">
-    <p class="text-xs text-gray-500 mb-1">שיחות טלפון</p>
-    <p class="text-3xl font-bold text-purple-400" id="stat-calls">—</p>
-  </div>
-  <div class="card p-5">
-    <p class="text-xs text-gray-500 mb-1">תשובות</p>
-    <p class="text-3xl font-bold text-green-400" id="stat-replies">—</p>
-  </div>
-  <div class="card p-5">
-    <p class="text-xs text-gray-500 mb-1">לידים חמים 🔥</p>
-    <p class="text-3xl font-bold text-orange-400" id="stat-hot">—</p>
-  </div>
-</div>
 
-<!-- Tabs -->
-<div class="flex gap-2 mb-4">
-  <button onclick="showTab('calls')"   id="btn-calls"   class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-indigo-600 text-white">📞 שיחות</button>
-  <button onclick="showTab('emails')"  id="btn-emails"  class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">📧 אימיילים</button>
-  <button onclick="showTab('replies')" id="btn-replies" class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">💬 תשובות</button>
-  <button onclick="showTab('live')"    id="btn-live"    class="tab-btn px-4 py-2 rounded-xl text-sm font-medium bg-gray-700 text-gray-300">🎧 האזנה</button>
-</div>
+  <!-- Pages -->
+  <div id="page-home"     class="p-4 slide-in"></div>
+  <div id="page-inbox"    class="p-4 slide-in hidden"></div>
+  <div id="page-lead"     class="p-4 slide-in hidden"></div>
+  <div id="page-outreach" class="p-4 slide-in hidden"></div>
+  <div id="page-settings" class="p-4 slide-in hidden"></div>
 
-<!-- Calls Tab -->
-<div id="tab-calls" class="card overflow-hidden">
-  <div class="p-4 border-b border-gray-700 flex items-center justify-between">
-    <p class="font-semibold">שיחות טלפון אחרונות</p>
-    <span class="text-xs text-gray-500">מ-(650) 383-1655</span>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead class="bg-gray-800">
-        <tr>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">שם סוכן</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">טלפון</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">נכס</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">מחיר</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">סטטוס</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">שעה</th>
-        </tr>
-      </thead>
-      <tbody id="calls-body">
-        <tr><td colspan="6" class="text-center py-8 text-gray-500">טוען...</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Emails Tab -->
-<div id="tab-emails" class="card overflow-hidden hidden">
-  <div class="p-4 border-b border-gray-700">
-    <p class="font-semibold">אימיילים שנשלחו</p>
-  </div>
-  <div class="overflow-x-auto">
-    <table class="w-full text-sm">
-      <thead class="bg-gray-800">
-        <tr>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">שם</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">אימייל</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">נכס</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">מחיר</th>
-          <th class="text-right px-4 py-3 text-xs text-gray-400">סטטוס</th>
-        </tr>
-      </thead>
-      <tbody id="emails-body">
-        <tr><td colspan="5" class="text-center py-8 text-gray-500">טוען...</td></tr>
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<!-- Replies Tab -->
-<div id="tab-replies" class="card overflow-hidden hidden">
-  <div class="p-4 border-b border-gray-700">
-    <p class="font-semibold">תשובות שהתקבלו</p>
-  </div>
-  <div id="replies-list" class="p-4 space-y-3">
-    <p class="text-center text-gray-500 py-4">טוען...</p>
-  </div>
-</div>
-
-<!-- Live Calls / Recordings Tab -->
-<div id="tab-live" class="hidden space-y-3">
-  <div class="card p-4">
-    <p class="font-semibold mb-4">🎧 האזנה לשיחות — Bland.ai</p>
-    <div id="recordings-list"><p class="text-gray-500 text-sm text-center py-4">טוען שיחות...</p></div>
+  <!-- Bottom Nav -->
+  <div class="fixed bottom-0 left-0 right-0 border-t border-gray-800 flex z-20" style="background:#0f1117;">
+    <button onclick="showPage('home')"     id="nav-home"     class="flex-1 py-3 text-center text-xs font-medium">🏠<br>Home</button>
+    <button onclick="showPage('inbox')"    id="nav-inbox"    class="flex-1 py-3 text-center text-xs font-medium">💬<br>Inbox</button>
+    <button onclick="showPage('outreach')" id="nav-outreach" class="flex-1 py-3 text-center text-xs font-medium">🚀<br>Outreach</button>
+    <button onclick="showPage('settings')" id="nav-settings" class="flex-1 py-3 text-center text-xs font-medium">⚙️<br>Settings</button>
   </div>
 </div>
 
 <script>
-const BLAND_KEY = 'org_ed8eb1111c2048a128c5cd35dbe2f256cb0430f51310cbcd2b0fddfdb4c1feec7558238acb59265bc98369';
 const API = 'https://zilloagent-production.up.railway.app';
+let token = localStorage.getItem('za_token');
+let agent = null;
 
-async function get(path) {
-    try {
-        const r = await fetch(API + path, { signal: AbortSignal.timeout(4000) });
-        return await r.json();
-    } catch { return null; }
+// ── API ───────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = {
+    method,
+    headers: {'Content-Type': 'application/json', ...(token ? {Authorization: `Bearer ${token}`} : {})},
+  };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(API + path, opts);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.detail || JSON.stringify(data));
+  return data;
 }
 
-async function loadStats() {
-    const s = await get('/api/stats');
-    if (!s) { document.getElementById('live-dot').innerHTML = '<div class="w-2 h-2 bg-red-400 rounded-full"></div><span class="text-red-400 text-sm">לא מחובר</span>'; return; }
-    document.getElementById('stat-emails').textContent  = s.emails  || 0;
-    document.getElementById('stat-calls').textContent   = s.calls   || 0;
-    document.getElementById('stat-replies').textContent = s.replies || 0;
-    document.getElementById('stat-hot').textContent     = s.hotLeads|| 0;
+// ── Auth ──────────────────────────────────────────────────────────────────────
+function showLogin()  { document.getElementById('signup-form').classList.add('hidden'); document.getElementById('login-form').classList.remove('hidden'); }
+function showSignup() { document.getElementById('login-form').classList.add('hidden');  document.getElementById('signup-form').classList.remove('hidden'); }
+
+async function doLogin() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-password').value;
+  const err   = document.getElementById('login-error');
+  err.classList.add('hidden');
+  if (!email||!pass) { err.textContent='Enter email and password'; err.classList.remove('hidden'); return; }
+  try {
+    const d = await api('POST','/auth/login',{email,password:pass});
+    token = d.token; agent = d.agent;
+    localStorage.setItem('za_token', token);
+    enterApp();
+  } catch(e) { err.textContent=e.message; err.classList.remove('hidden'); }
 }
 
-async function loadCalls() {
-    const data = await get('/api/calls');
-    const body = document.getElementById('calls-body');
-    if (!data || !data.length) { body.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500">אין שיחות עדיין</td></tr>'; return; }
-    body.innerHTML = [...data].reverse().map(c => `
-        <tr class="border-t border-gray-700 hover:bg-gray-800 transition">
-            <td class="px-4 py-3 font-medium">${c.name||'—'}</td>
-            <td class="px-4 py-3 text-gray-400 text-xs">${c.phone||'—'}</td>
-            <td class="px-4 py-3 text-gray-300 text-xs max-w-xs truncate">${c.address||'—'}</td>
-            <td class="px-4 py-3 text-green-400 text-xs">$${Number(c.price||0).toLocaleString()}</td>
-            <td class="px-4 py-3"><span class="badge-initiated text-xs px-2 py-1 rounded-full">${c.status||'—'}</span></td>
-            <td class="px-4 py-3 text-gray-500 text-xs">${(c.time||'').substring(11,16)}</td>
-        </tr>`).join('');
+async function doSignup() {
+  const name  = document.getElementById('signup-name').value.trim();
+  const email = document.getElementById('signup-email').value.trim();
+  const pass  = document.getElementById('signup-password').value;
+  const err   = document.getElementById('signup-error');
+  err.classList.add('hidden');
+  if (!name||!email||!pass) { err.textContent='Fill in all fields'; err.classList.remove('hidden'); return; }
+  if (pass.length<6) { err.textContent='Password must be at least 6 characters'; err.classList.remove('hidden'); return; }
+  try {
+    const d = await api('POST','/auth/signup',{name,email,password:pass});
+    token = d.token; agent = d.agent;
+    localStorage.setItem('za_token', token);
+    enterApp();
+  } catch(e) { err.textContent=e.message; err.classList.remove('hidden'); }
 }
 
-async function loadEmails() {
-    const data = await get('/api/emails');
-    const body = document.getElementById('emails-body');
-    if (!data || !data.length) { body.innerHTML = '<tr><td colspan="5" class="text-center py-8 text-gray-500">אין אימיילים עדיין</td></tr>'; return; }
-    body.innerHTML = [...data].reverse().map(e => `
-        <tr class="border-t border-gray-700 hover:bg-gray-800 transition">
-            <td class="px-4 py-3 font-medium">${e.name||'—'}</td>
-            <td class="px-4 py-3 text-blue-400 text-xs">${e.email||'—'}</td>
-            <td class="px-4 py-3 text-gray-300 text-xs max-w-xs truncate">${e.address||'—'}</td>
-            <td class="px-4 py-3 text-green-400 text-xs">$${Number(e.price||0).toLocaleString()}</td>
-            <td class="px-4 py-3"><span class="badge-sent text-xs px-2 py-1 rounded-full">${e.status||'—'}</span></td>
-        </tr>`).join('');
+function doLogout() {
+  localStorage.removeItem('za_token'); token=null; agent=null;
+  document.getElementById('app-screen').classList.add('hidden');
+  document.getElementById('auth-screen').classList.remove('hidden');
+  showLogin();
 }
 
-async function loadReplies() {
-    const data = await get('/api/replies');
-    const list = document.getElementById('replies-list');
-    if (!data || !data.length) { list.innerHTML = '<p class="text-center text-gray-500 py-4">אין תשובות עדיין</p>'; return; }
-    list.innerHTML = [...data].reverse().map(r => {
-        const cls = r.sentiment==='POSITIVE'?'badge-positive':r.sentiment==='NEGATIVE'?'badge-negative':'badge-neutral';
-        const emoji = r.sentiment==='POSITIVE'?'🔥':r.sentiment==='NEGATIVE'?'❌':'💬';
-        return `
-        <div class="bg-gray-800 rounded-xl p-4">
-            <div class="flex items-center justify-between mb-2">
-                <div>
-                    <p class="font-medium">${r.name||r.email}</p>
-                    <p class="text-xs text-gray-400">${r.email}</p>
-                </div>
-                <span class="${cls} text-xs px-2 py-1 rounded-full">${emoji} ${r.sentiment}</span>
+async function enterApp() {
+  document.getElementById('auth-screen').classList.add('hidden');
+  document.getElementById('app-screen').classList.remove('hidden');
+  if (!agent) {
+    try { agent = await api('GET','/auth/me'); } catch(e) { doLogout(); return; }
+  }
+  document.getElementById('agent-name-badge').textContent = agent.name || '';
+  if (!agent.has_twilio || !agent.has_gmail) document.getElementById('setup-banner').classList.remove('hidden');
+  else document.getElementById('setup-banner').classList.add('hidden');
+  showPage('home');
+}
+
+if (token) {
+  api('GET','/auth/me').then(a=>{agent=a; enterApp();}).catch(()=>{localStorage.removeItem('za_token'); token=null;});
+}
+
+// ── Nav ───────────────────────────────────────────────────────────────────────
+const NAV_PAGES = ['home','inbox','outreach','settings','lead'];
+
+function showPage(name) {
+  NAV_PAGES.forEach(p => {
+    document.getElementById(`page-${p}`).classList.add('hidden');
+  });
+  ['home','inbox','outreach','settings'].forEach(p => {
+    const nav = document.getElementById(`nav-${p}`);
+    if (nav) nav.className = 'flex-1 py-3 text-center text-xs font-medium text-gray-500';
+  });
+  document.getElementById(`page-${name}`).classList.remove('hidden');
+  const nav = document.getElementById(`nav-${name}`);
+  if (nav) nav.className = 'flex-1 py-3 text-center text-xs font-medium text-indigo-400';
+  if (name==='home')     renderHome();
+  if (name==='inbox')    renderInbox();
+  if (name==='outreach') renderOutreach();
+  if (name==='settings') renderSettings();
+}
+
+// ── HOME ──────────────────────────────────────────────────────────────────────
+async function renderHome() {
+  const el = document.getElementById('page-home');
+  el.innerHTML = '<p class="text-center text-gray-500 text-sm py-10">Loading...</p>';
+  try {
+    const s = await api('GET','/stats/today');
+    el.innerHTML = `
+      <h2 class="text-lg font-bold mb-4">Dashboard</h2>
+      <div class="grid grid-cols-2 gap-3 mb-5">
+        ${sCard('Messages Today', s.messages_sent_today ?? 0, 'text-blue-400')}
+        ${sCard('Hot Leads 🔥',   s.hot_leads ?? 0,          'text-orange-400')}
+        ${sCard('Response Rate',  (s.response_rate ?? 0)+'%','text-green-400')}
+        ${sCard('Total Leads',    s.total_leads ?? 0,         'text-purple-400')}
+      </div>
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-3">Consent Pipeline</p>
+        <div class="flex gap-2">
+          <div class="flex-1 bg-yellow-950 border border-yellow-800 rounded-xl p-3 text-center">
+            <p class="text-3xl font-bold text-yellow-300">${s.pending ?? 0}</p>
+            <p class="text-xs text-yellow-600 mt-1">⏳ Pending</p>
+          </div>
+          <div class="flex-1 bg-green-950 border border-green-800 rounded-xl p-3 text-center">
+            <p class="text-3xl font-bold text-green-300">${s.consented ?? 0}</p>
+            <p class="text-xs text-green-600 mt-1">✅ Consented</p>
+          </div>
+          <div class="flex-1 bg-red-950 border border-red-800 rounded-xl p-3 text-center">
+            <p class="text-3xl font-bold text-red-300">${s.opted_out ?? 0}</p>
+            <p class="text-xs text-red-600 mt-1">🚫 Opted Out</p>
+          </div>
+        </div>
+      </div>
+      <button onclick="showPage('outreach')" class="btn btn-primary w-full mb-3">🚀 Start New Outreach</button>
+      <button onclick="showPage('inbox')"    class="btn btn-secondary w-full">💬 View Inbox →</button>
+    `;
+  } catch(e) {
+    el.innerHTML = `<p class="text-red-400 text-sm text-center py-10">${e.message}</p>`;
+  }
+}
+
+function sCard(label, val, cls) {
+  return `<div class="card p-4"><p class="text-xs text-gray-500 mb-1">${label}</p><p class="text-3xl font-bold ${cls}">${val}</p></div>`;
+}
+
+// ── INBOX ─────────────────────────────────────────────────────────────────────
+let inboxFilter = 'all';
+
+async function renderInbox() {
+  const el = document.getElementById('page-inbox');
+  el.innerHTML = `
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-lg font-bold">Inbox</h2>
+    </div>
+    <div class="flex gap-1 mb-4 overflow-x-auto pb-1">
+      ${['all','pending','consented','opted_out'].map(f =>
+        `<button onclick="setFilter('${f}')"
+          class="flex-none px-3 py-1.5 rounded-lg text-xs font-medium ${inboxFilter===f ? 'bg-indigo-600 text-white' : 'bg-gray-800 text-gray-400'}">${f.replace('_',' ')}</button>`
+      ).join('')}
+    </div>
+    <div id="leads-list"><p class="text-center text-gray-500 text-sm py-10">Loading...</p></div>
+  `;
+  await loadLeads();
+}
+
+function setFilter(f) { inboxFilter=f; renderInbox(); }
+
+async function loadLeads() {
+  const el = document.getElementById('leads-list');
+  if (!el) return;
+  try {
+    const path = inboxFilter==='all' ? '/leads' : `/leads?consent_status=${inboxFilter}`;
+    const leads = await api('GET', path);
+    if (!leads.length) { el.innerHTML='<p class="text-center text-gray-500 text-sm py-10">No leads yet</p>'; return; }
+    el.innerHTML = leads.map(l => `
+      <div onclick="openLead(${l.id})" class="card p-4 mb-3 cursor-pointer active:border-indigo-500 transition">
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <p class="font-medium text-sm truncate">${l.contact_name||'Unknown'}</p>
+            <p class="text-xs text-gray-500 truncate mt-0.5">${l.contact_phone||l.contact_email||'—'}</p>
+          </div>
+          <div class="flex flex-col items-end gap-1 shrink-0">
+            ${cBadge(l.consent_status)}
+            ${(l.score||0)>=7 ? '<span class="text-xs text-orange-400">🔥 Hot</span>' : ''}
+          </div>
+        </div>
+        ${l.human_takeover ? '<p class="text-xs text-yellow-400 mt-2">👤 Human takeover</p>' : ''}
+      </div>
+    `).join('');
+  } catch(e) { el.innerHTML=`<p class="text-red-400 text-sm text-center py-10">${e.message}</p>`; }
+}
+
+function cBadge(s) {
+  if (s==='consented') return '<span class="badge-consented text-xs px-2 py-0.5 rounded-full font-medium">✅ Consented</span>';
+  if (s==='opted_out') return '<span class="badge-optedout text-xs px-2 py-0.5 rounded-full font-medium">🚫 Opted Out</span>';
+  return '<span class="badge-pending text-xs px-2 py-0.5 rounded-full font-medium">⏳ Pending</span>';
+}
+
+// ── LEAD DETAIL ───────────────────────────────────────────────────────────────
+async function openLead(id) {
+  showPage('lead');
+  const el = document.getElementById('page-lead');
+  el.innerHTML = '<p class="text-center text-gray-500 text-sm py-10">Loading...</p>';
+  try {
+    const l = await api('GET', `/leads/${id}`);
+    const msgs = (l.messages||[]);
+    el.innerHTML = `
+      <div class="flex items-center gap-3 mb-4">
+        <button onclick="showPage('inbox')" class="text-gray-400 hover:text-white text-xl leading-none">←</button>
+        <div class="flex-1 min-w-0">
+          <p class="font-semibold truncate">${l.contact_name||'Unknown'}</p>
+          <p class="text-xs text-gray-500 truncate">${[l.contact_phone,l.contact_email].filter(Boolean).join(' · ')}</p>
+        </div>
+        ${cBadge(l.consent_status)}
+      </div>
+
+      ${l.call_recording ? `
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-2">🎧 Call Recording</p>
+        <audio controls class="w-full" src="${l.call_recording}"></audio>
+      </div>` : ''}
+
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-3">Messages</p>
+        <div class="space-y-2 max-h-64 overflow-y-auto">
+          ${msgs.length ? msgs.map(m => `
+            <div class="flex ${m.direction==='outbound'?'justify-end':'justify-start'}">
+              <div class="max-w-xs px-3 py-2 rounded-2xl text-xs ${m.direction==='outbound'?'bg-indigo-600 text-white':'bg-gray-700 text-gray-200'}">
+                <p>${m.content||''}</p>
+                <p class="opacity-50 mt-1 text-right">${(m.created_at||'').slice(11,16)} · ${m.type||''}</p>
+              </div>
             </div>
-            <p class="text-sm text-gray-300">${r.subject||''}</p>
-            <p class="text-xs text-gray-500 mt-1">${(r.time||'').substring(0,16)}</p>
-        </div>`;
-    }).join('');
+          `).join('') : '<p class="text-gray-500 text-xs text-center py-4">No messages yet</p>'}
+        </div>
+      </div>
+
+      ${!l.human_takeover ? `
+      <div class="card p-4 mb-4">
+        <p class="text-sm font-semibold mb-3">Send Message</p>
+        <textarea id="manual-msg" class="input h-20 mb-3" placeholder="Type your message..."></textarea>
+        <div class="flex gap-2">
+          <button onclick="sendMsg(${l.id},'sms')"   class="btn btn-primary  flex-1 text-xs py-2">📱 SMS</button>
+          <button onclick="sendMsg(${l.id},'email')" class="btn btn-secondary flex-1 text-xs py-2">📧 Email</button>
+          <button onclick="takeover(${l.id})"        class="btn btn-secondary text-xs py-2 px-3">👤</button>
+        </div>
+      </div>` : `
+      <div class="bg-yellow-950 border border-yellow-800 p-3 rounded-xl text-sm mb-4">
+        👤 Human takeover — AI is paused for this lead
+        <button onclick="resumeAI(${l.id})" class="underline ml-2 text-xs">Resume AI</button>
+      </div>`}
+
+      <div class="card p-4 text-xs text-gray-500 space-y-1">
+        <p>Score: <span class="text-white font-medium">${l.score||0}/10</span> ${(l.score||0)>=7?'🔥':''}</p>
+        <p>Status: <span class="text-white">${l.status||'—'}</span></p>
+        <p>Consent: <span class="text-white">${l.consent_status||'—'}</span>${l.consent_timestamp?' · '+l.consent_timestamp.slice(0,16):''}</p>
+        <p>Follow-up sent: <span class="text-white">${l.followup_sent?'Yes':'No'}</span></p>
+        ${l.call_id ? `<p>Call ID: <span class="text-white font-mono">${l.call_id}</span></p>` : ''}
+      </div>
+    `;
+  } catch(e) { el.innerHTML=`<p class="text-red-400 text-sm text-center py-10">${e.message}</p>`; }
 }
 
-async function loadAll() {
-    await loadStats();
-    await loadCalls();
-    await loadEmails();
-    await loadReplies();
+async function sendMsg(id, type) {
+  const msg = document.getElementById('manual-msg')?.value.trim();
+  if (!msg) return;
+  try {
+    await api('POST',`/leads/${id}/message`,{message:msg,message_type:type});
+    document.getElementById('manual-msg').value='';
+    openLead(id);
+  } catch(e) { alert('Error: '+e.message); }
 }
 
-async function loadRecordings() {
-    try {
-        const r = await fetch('https://api.bland.ai/v1/calls?limit=20', {
-            headers: { 'authorization': BLAND_KEY }
-        });
-        const data = await r.json();
-        const calls = data.calls || [];
-        const list = document.getElementById('recordings-list');
-        if (!calls.length) { list.innerHTML = '<p class="text-gray-500 text-center py-4">אין שיחות עדיין</p>'; return; }
-        list.innerHTML = calls.map(c => {
-            const status = c.status === 'completed' ? '✅' : c.status === 'failed' ? '❌' : '🔄';
-            const duration = c.call_length ? `${Math.round(c.call_length)}s` : '—';
-            const answered = c.answered_by === 'human' ? '👤 אדם' : c.answered_by === 'voicemail' ? '📭 תא קולי' : '—';
-            const transcript = c.transcripts ? c.transcripts.map(t => `<p class="text-xs ${t.user==='assistant'?'text-indigo-300':'text-gray-300'}">${t.user==='assistant'?'🤖':'👤'} ${t.text}</p>`).join('') : '';
-            return `
-            <div class="bg-gray-800 rounded-xl p-4 mb-3">
-                <div class="flex items-center justify-between mb-2">
-                    <div>
-                        <p class="font-medium text-sm">${status} ${c.to || '—'}</p>
-                        <p class="text-xs text-gray-400">${answered} · ${duration} · ${(c.created_at||'').substring(0,16)}</p>
-                    </div>
-                    ${c.recording_url ? `
-                    <button onclick="playRecording('${c.recording_url}','audio-${c.call_id}')"
-                        class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs px-3 py-1.5 rounded-lg transition">
-                        ▶ האזן
-                    </button>` : '<span class="text-xs text-gray-500">אין הקלטה</span>'}
-                </div>
-                <audio id="audio-${c.call_id}" class="w-full mt-2 hidden" controls></audio>
-                ${transcript ? `<div class="mt-3 space-y-1 border-t border-gray-700 pt-3 max-h-32 overflow-y-auto">${transcript}</div>` : ''}
-            </div>`;
-        }).join('');
-    } catch(e) { document.getElementById('recordings-list').innerHTML = '<p class="text-red-400 text-sm text-center py-4">שגיאה בטעינת שיחות</p>'; }
+async function takeover(id) {
+  try { await api('POST',`/leads/${id}/takeover`); openLead(id); }
+  catch(e) { alert(e.message); }
 }
 
-function playRecording(url, audioId) {
-    const audio = document.getElementById(audioId);
-    audio.classList.remove('hidden');
-    audio.src = url;
-    audio.play();
+async function resumeAI(id) {
+  try { await api('DELETE',`/leads/${id}/takeover`); openLead(id); }
+  catch(e) { alert(e.message); }
 }
 
-function showTab(name) {
-    ['calls','emails','replies','live'].forEach(t => {
-        document.getElementById(`tab-${t}`).classList.toggle('hidden', t !== name);
-        document.getElementById(`btn-${t}`).className = `tab-btn px-4 py-2 rounded-xl text-sm font-medium ${t===name?'bg-indigo-600 text-white':'bg-gray-700 text-gray-300'}`;
-    });
-    if (name === 'live') loadRecordings();
+// ── OUTREACH ─────────────────────────────────────────────────────────────────
+function renderOutreach() {
+  document.getElementById('page-outreach').innerHTML = `
+    <h2 class="text-lg font-bold mb-4">🚀 Outreach</h2>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-1">Start Consent-SMS Campaign</p>
+      <p class="text-xs text-gray-500 mb-4">Sends "Reply YES for a call, STOP to opt out" from YOUR Twilio number. System then auto-calls anyone who says YES (9 AM–9 PM their time).</p>
+      <label class="text-xs text-gray-400 block mb-1">Target city</label>
+      <input id="o-city"  class="input mb-3" placeholder="e.g. Los Angeles, CA"/>
+      <label class="text-xs text-gray-400 block mb-1">Max contacts</label>
+      <input id="o-limit" class="input mb-4" type="number" value="15" min="1" max="250"/>
+      <button onclick="startOutreach()" class="btn btn-primary w-full">Send Campaign</button>
+      <div id="o-result" class="mt-3 text-sm hidden rounded-xl p-3"></div>
+    </div>
+
+    <div class="card p-4">
+      <p class="text-sm font-semibold mb-3">How it works</p>
+      <div class="space-y-3 text-xs text-gray-400">
+        <div class="flex gap-3"><span class="text-base">1️⃣</span><span>SMS from YOUR number: <em>"Hi [name], I have buyers looking in [city]. Reply YES for a call, STOP to opt out."</em></span></div>
+        <div class="flex gap-3"><span class="text-base">2️⃣</span><span>They reply <strong class="text-green-400">YES</strong> → consent logged → AI call placed automatically</span></div>
+        <div class="flex gap-3"><span class="text-base">3️⃣</span><span>They reply <strong class="text-red-400">STOP</strong> → added to DNC list, never contacted again</span></div>
+        <div class="flex gap-3"><span class="text-base">4️⃣</span><span>No reply → one follow-up SMS after 3 days, then silence</span></div>
+        <div class="flex gap-3"><span class="text-base">5️⃣</span><span>Hot leads (score 7+) → you get an email alert instantly</span></div>
+      </div>
+    </div>
+  `;
 }
 
-loadAll();
-setInterval(loadAll, 15000);
+async function startOutreach() {
+  const city  = document.getElementById('o-city').value.trim();
+  const limit = parseInt(document.getElementById('o-limit').value)||15;
+  const res   = document.getElementById('o-result');
+  if (!city) { res.textContent='Enter a target city'; res.className='mt-3 text-sm rounded-xl p-3 bg-red-950 text-red-400'; res.classList.remove('hidden'); return; }
+  try {
+    await api('POST','/outreach/run',{target_area:city,limit});
+    res.textContent = `✅ Campaign started — ${limit} contacts queued for ${city}. SMS will go out from your number shortly.`;
+    res.className = 'mt-3 text-sm rounded-xl p-3 bg-green-950 text-green-300';
+    res.classList.remove('hidden');
+  } catch(e) {
+    res.textContent = '❌ '+e.message;
+    res.className = 'mt-3 text-sm rounded-xl p-3 bg-red-950 text-red-400';
+    res.classList.remove('hidden');
+  }
+}
+
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
+function renderSettings() {
+  const el = document.getElementById('page-settings');
+  el.innerHTML = `
+    <h2 class="text-lg font-bold mb-4">⚙️ Settings</h2>
+
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-1">Account</p>
+      <p class="text-xs text-gray-400">${agent?.name||''}</p>
+      <p class="text-xs text-gray-500">${agent?.email||''}</p>
+    </div>
+
+    <!-- Twilio -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-semibold">📱 Twilio</p>
+        <span class="text-xs ${agent?.has_twilio?'text-green-400':'text-yellow-400'}">${agent?.has_twilio?'✅ Connected':'⚠️ Not set'}</span>
+      </div>
+      <div class="space-y-2 mb-3">
+        <input id="t-sid"   class="input text-xs" placeholder="Account SID — ACxxxx..." value="${agent?.twilio_sid||''}"/>
+        <input id="t-token" class="input text-xs" type="password" placeholder="Auth Token"/>
+        <input id="t-phone" class="input text-xs" placeholder="Phone number +1XXXXXXXXXX" value="${agent?.twilio_phone||''}"/>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-3 text-xs text-gray-400 mb-3 space-y-1">
+        <p class="font-semibold text-gray-300">Get Twilio credentials:</p>
+        <p>1. <a href="https://console.twilio.com" target="_blank" class="text-indigo-400 underline">console.twilio.com</a> → copy SID & Auth Token</p>
+        <p>2. Buy a phone number under Phone Numbers → Manage</p>
+        <p>3. Set Messaging webhook: <code class="bg-gray-700 px-1 rounded break-all">${API}/webhooks/twilio/sms</code></p>
+      </div>
+      <button onclick="saveTwilio()" class="btn btn-primary w-full text-xs py-2">Save Twilio</button>
+    </div>
+
+    <!-- Gmail -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-semibold">📧 Gmail</p>
+        <span class="text-xs ${agent?.has_gmail?'text-green-400':'text-yellow-400'}">${agent?.has_gmail?'✅ Connected':'⚠️ Not set'}</span>
+      </div>
+      <div class="space-y-2 mb-3">
+        <input id="g-user" class="input text-xs" type="email" placeholder="your@gmail.com" value="${agent?.gmail_user||''}"/>
+        <input id="g-pass" class="input text-xs" type="password" placeholder="Gmail App Password (16 chars)"/>
+      </div>
+      <div class="bg-gray-800 rounded-xl p-3 text-xs text-gray-400 mb-3 space-y-1">
+        <p class="font-semibold text-gray-300">Create a Gmail App Password:</p>
+        <p>1. Google Account → Security → enable 2-Step Verification</p>
+        <p>2. Search "App passwords" → create one called "ZilloAgent"</p>
+        <p>3. Paste the 16-character code here</p>
+      </div>
+      <button onclick="saveGmail()" class="btn btn-primary w-full text-xs py-2">Save Gmail</button>
+    </div>
+
+    <!-- Bland.ai -->
+    <div class="card p-4 mb-4">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-sm font-semibold">📞 Bland.ai (AI voice calls)</p>
+        <span class="text-xs ${agent?.has_bland?'text-green-400':'text-gray-500'}">${agent?.has_bland?'✅ Own key':'○ Uses shared key'}</span>
+      </div>
+      <input id="b-key" class="input text-xs mb-3" type="password" placeholder="Your Bland.ai API key (optional)"/>
+      <button onclick="saveBland()" class="btn btn-secondary w-full text-xs py-2">Save Bland.ai key</button>
+    </div>
+
+    <!-- Test -->
+    <div class="card p-4 mb-4">
+      <p class="text-sm font-semibold mb-3">🧪 Test Connections</p>
+      <button onclick="testCreds()" class="btn btn-secondary w-full text-xs py-2">Test Twilio + Gmail</button>
+      <div id="test-result" class="mt-3 text-xs space-y-1 hidden"></div>
+    </div>
+
+    <!-- Webhook reference -->
+    <div class="card p-4">
+      <p class="text-sm font-semibold mb-2">🔗 Twilio Webhook URL</p>
+      <p class="text-xs text-gray-500 mb-2">Set this in Twilio console under your phone number's Messaging webhook (HTTP POST):</p>
+      <div class="bg-gray-800 rounded-lg px-3 py-2 text-xs font-mono text-indigo-300 break-all">${API}/webhooks/twilio/sms</div>
+    </div>
+  `;
+}
+
+async function saveTwilio() {
+  const sid   = document.getElementById('t-sid').value.trim();
+  const tok   = document.getElementById('t-token').value.trim();
+  const phone = document.getElementById('t-phone').value.trim();
+  if (!sid||!phone) { alert('Enter SID and phone number'); return; }
+  const body = {twilio_sid:sid, twilio_phone:phone};
+  if (tok) body.twilio_token = tok;
+  try { const d = await api('PUT','/auth/credentials',body); agent=d.agent; alert('✅ Twilio saved!'); renderSettings(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+async function saveGmail() {
+  const user = document.getElementById('g-user').value.trim();
+  const pass = document.getElementById('g-pass').value.trim();
+  if (!user) { alert('Enter your Gmail address'); return; }
+  const body = {gmail_user:user};
+  if (pass) body.gmail_password = pass;
+  try { const d = await api('PUT','/auth/credentials',body); agent=d.agent; alert('✅ Gmail saved!'); renderSettings(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+async function saveBland() {
+  const key = document.getElementById('b-key').value.trim();
+  if (!key) { alert('Enter your Bland.ai key'); return; }
+  try { const d = await api('PUT','/auth/credentials',{bland_key:key}); agent=d.agent; alert('✅ Bland.ai key saved!'); renderSettings(); }
+  catch(e) { alert('Error: '+e.message); }
+}
+
+async function testCreds() {
+  const el = document.getElementById('test-result');
+  el.innerHTML='<p class="text-gray-400">Testing...</p>'; el.classList.remove('hidden');
+  try {
+    const r = await api('POST','/auth/test-credentials');
+    el.innerHTML = Object.entries(r).map(([k,v])=>`<p>${k}: <span class="${String(v).includes('✅')?'text-green-400':'text-red-400'}">${v}</span></p>`).join('');
+  } catch(e) { el.innerHTML=`<p class="text-red-400">${e.message}</p>`; }
+}
+
+// Auto-refresh home stats every 30s
+setInterval(() => {
+  if (token && !document.getElementById('page-home').classList.contains('hidden')) renderHome();
+}, 30000);
 </script>
 </body>
 </html>
