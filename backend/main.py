@@ -164,6 +164,9 @@ class SendCodeRequest(BaseModel):
     phone: str
     email: str
 
+class GoogleAuthRequest(BaseModel):
+    credential: str      # Google ID token (JWT) from Google Identity Services
+
 class CredentialsUpdate(BaseModel):
     name: Optional[str] = None
     company: Optional[str] = None
@@ -262,6 +265,47 @@ def send_code(req: SendCodeRequest, db: Session = Depends(get_db)):
     if not ok:
         raise HTTPException(500, "Could not send verification email. Check email address.")
     return {"sent": True, "existing": False}
+
+
+@app.post("/auth/google")
+def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)):
+    """Sign in / sign up with a Google account. Verifies the Google ID token,
+    then logs in (or creates) the agent keyed by their Google email."""
+    try:
+        r = httpx.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": req.credential}, timeout=10,
+        )
+        info = r.json()
+    except Exception:
+        raise HTTPException(400, "Could not verify Google sign-in.")
+    if r.status_code != 200 or not info.get("email"):
+        raise HTTPException(401, "Invalid Google token.")
+    if info.get("email_verified") not in ("true", True):
+        raise HTTPException(401, "Google email not verified.")
+
+    # If a client id is configured, enforce the token audience matches it.
+    client_id = os.getenv("GOOGLE_CLIENT_ID", "")
+    if client_id and info.get("aud") != client_id:
+        raise HTTPException(401, "Google token audience mismatch.")
+
+    email = info["email"].lower()
+    agent = db.query(Agent).filter(Agent.email == email).first()
+    if not agent:
+        agent = Agent(
+            name=info.get("name") or email.split("@")[0],
+            email=email,
+            password_hash="",          # no password — Google-authenticated
+            daily_sms_limit=350,
+            daily_call_limit=20,
+        )
+        db.add(agent)
+        db.commit()
+        db.refresh(agent)
+        new = True
+    else:
+        new = False
+    return {"token": create_token(agent.id), "agent": _agent_dict(agent), "new": new}
 
 
 @app.post("/auth/enter")
