@@ -72,11 +72,11 @@ def _start_outreach_scheduler():
 
     sched = BackgroundScheduler(timezone="UTC")
 
-    # 50 AI calls/day total: ~17 per city, each at 10 AM that city's local time (DST-aware)
+    # 20 AI calls/day total, each at 10 AM that city's local time (DST-aware)
     for city, count, tz in [
-        ("New York, NY",    17, "America/New_York"),
-        ("Austin, TX",      16, "America/Chicago"),
-        ("Los Angeles, CA", 17, "America/Los_Angeles"),
+        ("New York, NY",     7, "America/New_York"),
+        ("Austin, TX",       6, "America/Chicago"),
+        ("Los Angeles, CA",  7, "America/Los_Angeles"),
     ]:
         sched.add_job(
             run_call_campaign, CronTrigger(hour=10, minute=0, timezone=tz),
