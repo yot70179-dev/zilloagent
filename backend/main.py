@@ -61,7 +61,7 @@ def _start_outreach_scheduler():
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
-        from cloud_outreach import run_call_campaign
+        from cloud_outreach import run_call_campaign, run_email_campaign, check_replies_and_call
     except Exception as e:
         logger.warning("Outreach scheduler not started (import failed): %s", e)
         return
@@ -70,22 +70,58 @@ def _start_outreach_scheduler():
         logger.warning("Outreach scheduler idle — set BLANDAI_KEY and RAPIDAPI_KEY on Railway to enable.")
         return
 
+    sched = BackgroundScheduler(timezone="UTC")
+
     # 50 AI calls/day total: ~17 per city, each at 10 AM that city's local time (DST-aware)
-    plan = [
+    for city, count, tz in [
         ("New York, NY",    17, "America/New_York"),
         ("Austin, TX",      16, "America/Chicago"),
         ("Los Angeles, CA", 17, "America/Los_Angeles"),
-    ]
-    sched = BackgroundScheduler(timezone="UTC")
-    for city, count, tz in plan:
+    ]:
         sched.add_job(
             run_call_campaign, CronTrigger(hour=10, minute=0, timezone=tz),
             args=[city, count], id=f"calls::{city}", replace_existing=True,
             misfire_grace_time=3600, coalesce=True,
         )
+
+    # Daily product-pitch emails (9 AM ET) — only if Gmail is configured
+    if os.getenv("GMAIL_USER") and os.getenv("GMAIL_APP_PASSWORD"):
+        sched.add_job(
+            run_email_campaign, CronTrigger(hour=9, minute=0, timezone="America/New_York"),
+            id="emails::daily", replace_existing=True, misfire_grace_time=3600, coalesce=True,
+        )
+        # Check replies every 10 minutes → YES turns into an AI call automatically
+        sched.add_job(
+            check_replies_and_call, CronTrigger(minute="*/10"),
+            id="replies::poll", replace_existing=True, misfire_grace_time=300, coalesce=True,
+        )
+
     sched.start()
     app.state.scheduler = sched
-    logger.info("Outreach scheduler started: 50 calls/day at 10 AM local across NY/Austin/LA.")
+    logger.info("Outreach scheduler started: calls (10 AM local), emails (9 AM ET), reply-poll every 10 min.")
+
+
+@app.get("/outreach/status")
+def outreach_status():
+    """Diagnostic: what's configured in this cloud environment (no secrets revealed)."""
+    db_url = os.getenv("DATABASE_URL", "sqlite:///./zilloagent.db")
+    running = bool(getattr(app.state, "scheduler", None) and app.state.scheduler.running)
+    contacts = None
+    try:
+        from cloud_outreach import OutreachContact
+        db = SessionLocal()
+        contacts = db.query(OutreachContact).count()
+        db.close()
+    except Exception:
+        pass
+    return {
+        "scheduler_running": running,
+        "has_bland_key":   bool(os.getenv("BLANDAI_KEY")),
+        "has_rapidapi_key": bool(os.getenv("RAPIDAPI_KEY")),
+        "has_gmail":       bool(os.getenv("GMAIL_USER") and os.getenv("GMAIL_APP_PASSWORD")),
+        "db_persistent":   not db_url.startswith("sqlite"),
+        "contacts_stored": contacts,
+    }
 
 
 @app.post("/outreach/calls/run")

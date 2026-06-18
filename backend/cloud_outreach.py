@@ -9,13 +9,45 @@ Env vars required on Railway:
 Optional:
   PRODUCT_LINK   - signup link mentioned on the call (defaults below)
 """
+import email as email_lib
+import imaplib
 import logging
 import os
+import random
+import smtplib
 import time
+from datetime import datetime
+from email.mime.text import MIMEText
+from email.utils import parseaddr
 
 import httpx
+from sqlalchemy import Boolean, Column, DateTime, Integer, String
+
+from database import Base, SessionLocal, engine
 
 logger = logging.getLogger("cloud_outreach")
+
+
+# ── Persistence: who we've emailed (maps reply email -> phone for the call) ──
+class OutreachContact(Base):
+    __tablename__ = "outreach_contacts"
+    id        = Column(Integer, primary_key=True)
+    email     = Column(String(200), unique=True, index=True)
+    phone     = Column(String(20))
+    name      = Column(String(200))
+    address   = Column(String(300))
+    price     = Column(String(40))
+    city      = Column(String(120))
+    sent_at   = Column(DateTime, default=datetime.utcnow)
+    replied   = Column(Boolean, default=False)
+    called    = Column(Boolean, default=False)
+
+
+# Ensure the table exists (startup already ran create_tables before import)
+try:
+    OutreachContact.__table__.create(bind=engine, checkfirst=True)
+except Exception as e:
+    logger.warning("Could not ensure outreach_contacts table: %s", e)
 
 RAPIDAPI_HOST = "us-real-estate-listings.p.rapidapi.com"
 PRODUCT_LINK = os.getenv("PRODUCT_LINK", "https://yot70179-dev.github.io/zilloagent/")
@@ -74,8 +106,10 @@ def _fetch_agent_phones(city: str, limit: int) -> list[dict]:
             agents.append({
                 "phone": phone,
                 "name": adv.get("name", ""),
+                "email": adv.get("email", ""),
                 "address": loc.get("line", ""),
                 "price": listing.get("list_price", ""),
+                "city": loc.get("city", ""),
             })
             if len(agents) >= limit:
                 break
@@ -127,3 +161,196 @@ def run_call_campaign(city: str, count: int) -> dict:
         time.sleep(1.2)
     logger.info("Cloud campaign %s DONE: placed=%d failed=%d", city, placed, failed)
     return {"city": city, "placed": placed, "failed": failed}
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Email outreach (Gmail SMTP) — pitch the product, then reply YES -> AI call
+# ══════════════════════════════════════════════════════════════════════════
+
+_SKIP_DOMAINS = {
+    "gmail.com", "hotmail.com", "yahoo.com", "aol.com", "outlook.com", "icloud.com",
+    "me.com", "msn.com", "live.com", "ymail.com", "cox.net", "sbcglobal.net",
+    "verizon.net", "att.net", "comcast.net", "earthlink.net",
+}
+
+
+def _is_business_email(e: str) -> bool:
+    import re
+    if not e or not re.match(r"^[\w.\-+]+@[\w.\-]+\.[A-Za-z]{2,}$", e):
+        return False
+    return e.split("@")[1].lower() not in _SKIP_DOMAINS
+
+
+def _email_body(first: str, city: str, link: str) -> str:
+    templates = [
+        (f"Hi {first},\n\nI'm the founder of ZilloAgent, an AI tool built for real estate agents like you.\n\n"
+         f"It automatically texts and calls every buyer and seller lead from your Zillow listings, 24/7 - "
+         f"qualifies them, and only passes the hot, ready-to-close leads back to you. No more hours wasted on "
+         f"cold follow-up.\n\nI'm giving free access to a handful of agents in {city} right now. Interested?\n\n"
+         f"Just reply YES and I'll call you to walk you through it. Or check it out here: {link}\n\n"
+         f"Best,\nAlex - ZilloAgent\n\n---\nReply STOP to unsubscribe."),
+        (f"Hello {first},\n\nHow much time do you spend chasing leads that never reply?\n\n"
+         f"I built ZilloAgent to fix exactly that - an AI assistant that follows up with every lead from your "
+         f"listings automatically by text and call, qualifies them, and hands you only the ones ready to move.\n\n"
+         f"I'd love to give you free access while I'm onboarding agents in {city}. Reply YES and I'll give you a "
+         f"quick call to explain. More info: {link}\n\nBest,\nAlex - ZilloAgent\n\n---\nReply STOP to unsubscribe."),
+    ]
+    return random.choice(templates)
+
+
+def _send_email(to_email: str, to_name: str, subject: str, body: str) -> bool:
+    user = os.getenv("GMAIL_USER", "")
+    pw   = os.getenv("GMAIL_APP_PASSWORD", "")
+    if not user or not pw:
+        logger.warning("GMAIL creds missing — email not sent")
+        return False
+    try:
+        msg = MIMEText(body)
+        msg["Subject"] = subject
+        msg["From"]    = f"Alex - ZilloAgent <{user}>"
+        msg["To"]      = to_email
+        with smtplib.SMTP("smtp.gmail.com", 587) as s:
+            s.starttls()
+            s.login(user, pw)
+            s.send_message(msg)
+        return True
+    except Exception as e:
+        logger.error("Email send failed to %s: %s", to_email, e)
+        return False
+
+
+def run_email_campaign(cities: list[str] | None = None, target: int = 50) -> dict:
+    """Fetch agents across cities and email a product pitch to new business contacts."""
+    if not os.getenv("RAPIDAPI_KEY") or not os.getenv("GMAIL_USER"):
+        logger.error("Missing RAPIDAPI_KEY/GMAIL creds — skipping email campaign")
+        return {"sent": 0, "error": "missing_keys"}
+
+    cities = cities or ["New York, NY", "Los Angeles, CA", "Austin, TX"]
+    link = PRODUCT_LINK
+    per_city = target // len(cities) + 10
+    db = SessionLocal()
+    sent = 0
+    try:
+        existing = {c.email for c in db.query(OutreachContact.email).all() if c.email}
+        for city in cities:
+            if sent >= target:
+                break
+            for a in _fetch_agent_phones(city, per_city):
+                if sent >= target:
+                    break
+                em = (a.get("email") or "").lower()
+                if not _is_business_email(em) or em in existing:
+                    continue
+                first = (a.get("name") or "there").split()[0]
+                subject = f"Free AI tool for your {a.get('city') or city} listings, {first}?"
+                if _send_email(em, a.get("name", ""), subject, _email_body(first, a.get("city") or city, link)):
+                    existing.add(em)
+                    db.add(OutreachContact(
+                        email=em, phone=a.get("phone", ""), name=a.get("name", ""),
+                        address=a.get("address", ""), price=str(a.get("price", "")),
+                        city=a.get("city") or city,
+                    ))
+                    db.commit()
+                    sent += 1
+                    logger.info("Email %d/%d -> %s (%s)", sent, target, em, city)
+                time.sleep(1.2)
+    except Exception as e:
+        logger.error("run_email_campaign error: %s", e)
+    finally:
+        db.close()
+    logger.info("Email campaign done: sent=%d", sent)
+    return {"sent": sent}
+
+
+# ── Reply handling: YES -> AI call, NO -> nothing ──────────────────────────
+_POSITIVE = ("interested", "yes", "sure", "absolutely", "sounds good", "tell me more",
+             "call me", "let's talk", "lets talk", "would like", "schedule", "set up a",
+             "more info", "how does", "send me", "open to")
+_NEGATIVE = ("not interested", "no thanks", "no thank you", "stop", "unsubscribe",
+             "remove me", "do not contact", "don't contact", "not looking", "already have")
+
+
+def _sentiment(text: str) -> str:
+    t = text.lower()
+    if any(k in t for k in _NEGATIVE):
+        return "NEGATIVE"
+    if any(k in t for k in _POSITIVE):
+        return "POSITIVE"
+    return "NEUTRAL"
+
+
+def check_replies_and_call() -> dict:
+    """Read unseen Gmail replies; YES -> place AI call to that agent. Runs in cloud."""
+    user = os.getenv("GMAIL_USER", "")
+    pw   = os.getenv("GMAIL_APP_PASSWORD", "")
+    if not user or not pw:
+        return {"checked": 0, "error": "missing_gmail"}
+
+    db = SessionLocal()
+    positive = negative = processed = 0
+    try:
+        contacts = {c.email.lower(): c for c in db.query(OutreachContact).all() if c.email}
+        if not contacts:
+            return {"checked": 0, "note": "no contacts yet"}
+
+        M = imaplib.IMAP4_SSL("imap.gmail.com")
+        M.login(user, pw)
+        M.select("INBOX")
+        typ, data = M.search(None, "UNSEEN")
+        ids = data[0].split() if data and data[0] else []
+        for num in ids:
+            typ, msg_data = M.fetch(num, "(RFC822)")
+            if not msg_data or not msg_data[0]:
+                continue
+            msg = email_lib.message_from_bytes(msg_data[0][1])
+            from_hdr = parseaddr(msg.get("From", ""))[1].lower()
+            if from_hdr not in contacts:
+                continue
+            subject = msg.get("Subject", "")
+            body = ""
+            if msg.is_multipart():
+                for part in msg.walk():
+                    if part.get_content_type() == "text/plain":
+                        try:
+                            body = part.get_payload(decode=True).decode(errors="ignore")
+                        except Exception:
+                            pass
+                        break
+            else:
+                try:
+                    body = msg.get_payload(decode=True).decode(errors="ignore")
+                except Exception:
+                    body = ""
+            verdict = _sentiment(f"{subject} {body}")
+            processed += 1
+            c = contacts[from_hdr]
+            first = (c.name or "there").split()[0]
+            if verdict == "POSITIVE":
+                positive += 1
+                if c.phone and not c.called:
+                    try:
+                        res = _place_bland_call(c.phone)
+                        if res.get("call_id"):
+                            c.called = True
+                            logger.info("Reply YES -> calling %s %s id=%s", c.name, c.phone, res["call_id"])
+                    except Exception as e:
+                        logger.error("Reply call failed %s: %s", c.phone, e)
+                _send_email(from_hdr, c.name or "", f"Re: {subject}",
+                            f"Hi {first},\n\nGreat - I'll call you shortly to walk you through ZilloAgent and get "
+                            f"you free access. Talk soon!\n\nBest,\nAlex - ZilloAgent")
+                c.replied = True
+            elif verdict == "NEGATIVE":
+                negative += 1
+                c.replied = True
+                _send_email(from_hdr, c.name or "", f"Re: {subject}",
+                            f"Hi {first},\n\nNo problem at all - I've removed you from the list. Wishing you the "
+                            f"best!\n\nBest,\nAlex - ZilloAgent")
+            db.commit()
+            M.store(num, "+FLAGS", "\\Seen")
+        M.logout()
+    except Exception as e:
+        logger.error("check_replies_and_call error: %s", e)
+    finally:
+        db.close()
+    logger.info("Replies checked: processed=%d positive=%d negative=%d", processed, positive, negative)
+    return {"checked": processed, "positive": positive, "negative": negative}
