@@ -53,6 +53,56 @@ app.add_middleware(
 def on_startup():
     create_tables()
     logger.info("ZilloAgent backend started")
+    _start_outreach_scheduler()
+
+
+def _start_outreach_scheduler():
+    """Schedule daily AI call campaigns at 10 AM local time in each city (cloud, always-on)."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from cloud_outreach import run_call_campaign
+    except Exception as e:
+        logger.warning("Outreach scheduler not started (import failed): %s", e)
+        return
+
+    if not os.getenv("BLANDAI_KEY") or not os.getenv("RAPIDAPI_KEY"):
+        logger.warning("Outreach scheduler idle — set BLANDAI_KEY and RAPIDAPI_KEY on Railway to enable.")
+        return
+
+    # 50 AI calls/day total: ~17 per city, each at 10 AM that city's local time (DST-aware)
+    plan = [
+        ("New York, NY",    17, "America/New_York"),
+        ("Austin, TX",      16, "America/Chicago"),
+        ("Los Angeles, CA", 17, "America/Los_Angeles"),
+    ]
+    sched = BackgroundScheduler(timezone="UTC")
+    for city, count, tz in plan:
+        sched.add_job(
+            run_call_campaign, CronTrigger(hour=10, minute=0, timezone=tz),
+            args=[city, count], id=f"calls::{city}", replace_existing=True,
+            misfire_grace_time=3600, coalesce=True,
+        )
+    sched.start()
+    app.state.scheduler = sched
+    logger.info("Outreach scheduler started: 50 calls/day at 10 AM local across NY/Austin/LA.")
+
+
+@app.post("/outreach/calls/run")
+def trigger_call_campaign(
+    background_tasks: BackgroundTasks,
+    city: str = Query("New York, NY"),
+    count: int = Query(5),
+    token: str = Query(""),
+):
+    """Manually fire an AI call campaign now (for testing the cloud pipeline).
+    Guard with the ADMIN_TOKEN env var set on Railway."""
+    admin = os.getenv("ADMIN_TOKEN", "")
+    if not admin or token != admin:
+        raise HTTPException(403, "Invalid or missing admin token.")
+    from cloud_outreach import run_call_campaign
+    background_tasks.add_task(run_call_campaign, city, count)
+    return {"status": "started", "city": city, "count": count}
 
 
 def get_db():
@@ -72,6 +122,11 @@ class PhoneAuthRequest(BaseModel):
     name: Optional[str] = None      # only needed for new accounts
     company: Optional[str] = None
     email: Optional[str] = None
+    code: Optional[str] = None       # email verification code (new accounts)
+
+class SendCodeRequest(BaseModel):
+    phone: str
+    email: str
 
 class CredentialsUpdate(BaseModel):
     name: Optional[str] = None
@@ -121,6 +176,58 @@ def _normalize_phone(raw: str) -> str:
     return "+" + digits
 
 
+# ── Email verification codes (in-memory, short-lived) ────────────────────────
+import random
+import smtplib
+import time as _time
+from email.mime.text import MIMEText
+
+_verification_codes: Dict[str, dict] = {}   # email -> {code, phone, expires}
+_CODE_TTL = 600   # 10 minutes
+
+
+def _send_verification_email(to_email: str, code: str) -> bool:
+    user = os.getenv("GMAIL_USER", "")
+    pw   = os.getenv("GMAIL_APP_PASSWORD", "")
+    if not user or not pw:
+        logger.warning("GMAIL creds missing — cannot send verification code")
+        return False
+    try:
+        msg = MIMEText(
+            f"Your ZilloAgent verification code is: {code}\n\n"
+            f"It expires in 10 minutes. If you didn't request this, ignore this email."
+        )
+        msg["Subject"] = f"{code} is your ZilloAgent code"
+        msg["From"]    = f"ZilloAgent <{user}>"
+        msg["To"]      = to_email
+        with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
+            smtp.starttls()
+            smtp.login(user, pw)
+            smtp.send_message(msg)
+        return True
+    except Exception as e:
+        logger.error("Failed to send verification email: %s", e)
+        return False
+
+
+@app.post("/auth/send-code")
+def send_code(req: SendCodeRequest, db: Session = Depends(get_db)):
+    """Send a 6-digit verification code to the email. Only needed for new accounts."""
+    phone = _normalize_phone(req.phone)
+    email = req.email.strip().lower()
+
+    # Existing account → no verification needed, frontend logs in directly.
+    if db.query(Agent).filter(Agent.phone == phone).first():
+        return {"sent": False, "existing": True}
+
+    code = f"{random.randint(0, 999999):06d}"
+    _verification_codes[email] = {"code": code, "phone": phone, "expires": _time.time() + _CODE_TTL}
+    ok = _send_verification_email(email, code)
+    if not ok:
+        raise HTTPException(500, "Could not send verification email. Check email address.")
+    return {"sent": True, "existing": False}
+
+
 @app.post("/auth/enter")
 def phone_enter(req: PhoneAuthRequest, db: Session = Depends(get_db)):
     """
@@ -132,12 +239,27 @@ def phone_enter(req: PhoneAuthRequest, db: Session = Depends(get_db)):
     agent = db.query(Agent).filter(Agent.phone == phone).first()
 
     if agent:
-        # Existing user — just log in
+        # Existing user — just log in. Backfill email if newly provided.
+        if req.email and not agent.email:
+            agent.email = req.email.lower()
+            db.commit()
+            db.refresh(agent)
         return {"token": create_token(agent.id), "agent": _agent_dict(agent), "new": False}
 
-    # New user — name is required
+    # New user. If a verification code was sent for this email, enforce it
+    # (new email+phone flow). Otherwise fall back to direct create (legacy flow)
+    # so existing clients keep working — backward compatible.
+    email = req.email.strip().lower() if req.email else None
+    rec = _verification_codes.get(email) if email else None
+    if rec:
+        if rec["expires"] < _time.time():
+            raise HTTPException(400, "Verification code expired. Request a new one.")
+        if not req.code or req.code.strip() != rec["code"]:
+            raise HTTPException(400, "Incorrect verification code.")
+        _verification_codes.pop(email, None)   # one-time use
+
     if not req.name or not req.name.strip():
-        raise HTTPException(400, "new_user")   # frontend shows name form
+        req.name = email.split("@")[0] if email else "Agent"
 
     agent = Agent(
         name=req.name.strip(),
