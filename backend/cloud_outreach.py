@@ -137,6 +137,60 @@ def _place_bland_call(phone: str) -> dict:
     return r.json()
 
 
+PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://zilloagent-production.up.railway.app")
+
+OWNER_LEADGEN_TASK = (
+    "You are an assistant calling on behalf of a top local real estate agent. Politely and briefly ask the "
+    "person if they would be open to connecting with a local realtor who can help them sell their property or "
+    "has interested buyers. Be warm, natural, and under 60 seconds. If they show any interest or say yes, say "
+    "'Great — the agent will reach out to you shortly,' and confirm the best number to reach them. If they are "
+    "not interested, thank them politely and end the call. Do not be pushy."
+)
+
+
+def run_broker_leadgen(broker_id: int, area: str, limit: int = 15) -> dict:
+    """The moment a broker signs up: call property contacts in their area and ask if they want to
+    connect with a realtor. Bland reports each call result to /webhooks/bland/result, which turns
+    an interested answer into a lead for this broker."""
+    if not os.getenv("BLANDAI_KEY") or not os.getenv("RAPIDAPI_KEY"):
+        logger.error("Missing keys — skipping leadgen for broker %s", broker_id)
+        return {"placed": 0, "error": "missing_keys"}
+
+    contacts = _fetch_agent_phones(area, limit)
+    logger.info("Leadgen for broker %s in %s: %d contacts", broker_id, area, len(contacts))
+    placed = 0
+    key = os.getenv("BLANDAI_KEY", "")
+    for c in contacts:
+        body = {
+            "phone_number": c["phone"],
+            "task": OWNER_LEADGEN_TASK,
+            "voice": "nat",
+            "max_duration": 2,
+            "record": True,
+            "answered_by_enabled": True,
+            "webhook": f"{PUBLIC_BASE_URL}/webhooks/bland/result",
+            "metadata": {
+                "broker_id": broker_id,
+                "owner_name": c.get("name", ""),
+                "owner_phone": c["phone"],
+                "address": c.get("address", ""),
+                "price": str(c.get("price", "")),
+                "city": c.get("city", "") or area,
+            },
+        }
+        try:
+            r = httpx.post("https://api.bland.ai/v1/calls",
+                           headers={"authorization": key, "Content-Type": "application/json"},
+                           json=body, timeout=20)
+            if r.json().get("call_id"):
+                placed += 1
+        except Exception as e:
+            logger.error("Leadgen call error %s: %s", c["phone"], e)
+        time.sleep(1.0)
+    logger.info("Leadgen broker %s DONE: placed=%d calls", broker_id, placed)
+    return {"placed": placed, "area": area}
+
+
 def run_call_campaign(city: str, count: int) -> dict:
     """Fetch `count` agents in `city` and place an AI call to each. Returns a summary."""
     if not os.getenv("BLANDAI_KEY") or not os.getenv("RAPIDAPI_KEY"):

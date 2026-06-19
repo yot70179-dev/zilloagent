@@ -267,6 +267,75 @@ def send_code(req: SendCodeRequest, db: Session = Depends(get_db)):
     return {"sent": True, "existing": False}
 
 
+@app.post("/webhooks/bland/result")
+async def bland_result(request: Request, db: Session = Depends(get_db)):
+    """Bland calls this when a leadgen call ends. If the owner showed interest,
+    create a lead for the broker and notify them (dashboard + email)."""
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": False}
+    meta = payload.get("metadata") or {}
+    broker_id = meta.get("broker_id")
+    if not broker_id:
+        return {"ok": True, "skip": "no broker_id"}
+
+    transcript = payload.get("concatenated_transcript") or payload.get("summary") or ""
+    answered_by = payload.get("answered_by", "")
+    # Only consider real human conversations
+    if answered_by == "voicemail":
+        return {"ok": True, "skip": "voicemail"}
+
+    try:
+        from cloud_outreach import _sentiment
+        interested = _sentiment(transcript) == "POSITIVE"
+    except Exception:
+        interested = False
+    if not interested:
+        return {"ok": True, "interested": False}
+
+    owner_phone = meta.get("owner_phone", "")
+    # Avoid duplicate leads for the same broker+owner
+    existing = db.query(Lead).filter(Lead.agent_id == broker_id,
+                                     Lead.contact_phone == owner_phone).first()
+    if not existing:
+        lead = Lead(
+            agent_id=broker_id,
+            contact_name=meta.get("owner_name", "") or "Property owner",
+            contact_phone=owner_phone,
+            status=LeadStatus.NEW,
+            consent_status=ConsentStatus.CONSENTED,
+            consent_timestamp=datetime.utcnow(),
+            call_transcript=transcript[:4000],
+            notes=f"Interested owner. {meta.get('address','')} {meta.get('price','')}".strip(),
+        )
+        db.add(lead)
+        db.commit()
+        db.refresh(lead)
+    else:
+        lead = existing
+
+    # Notify the broker by email
+    broker = db.query(Agent).filter(Agent.id == broker_id).first()
+    to_email = (broker.gmail_user or broker.email) if broker else None
+    if to_email:
+        try:
+            sender = MessageSender(broker)
+            sender.send_email(
+                to_email, broker.name or "",
+                "🔥 New interested lead from ZilloAgent",
+                f"Good news! A property owner is interested in connecting with you.\n\n"
+                f"Name:  {meta.get('owner_name','—')}\n"
+                f"Phone: {owner_phone}\n"
+                f"Property: {meta.get('address','—')} {meta.get('price','')}\n\n"
+                f"Reach out to them soon — they just said yes on the call. "
+                f"See full details in your ZilloAgent dashboard.",
+            )
+        except Exception as e:
+            logger.error("Broker notify email failed: %s", e)
+    return {"ok": True, "interested": True, "lead_id": lead.id}
+
+
 @app.post("/auth/google")
 def google_auth(req: GoogleAuthRequest, db: Session = Depends(get_db)):
     """Sign in / sign up with a Google account. Verifies the Google ID token,
@@ -599,8 +668,11 @@ def run_outreach(
     agent: Agent = Depends(get_current_agent),
     db: Session = Depends(get_db),
 ):
-    background_tasks.add_task(_run_outreach_task, agent.id, req.target_area, req.limit)
-    return {"ok": True, "message": f"Outreach started for {req.target_area}"}
+    # Lead-gen: AI calls property contacts in the area and asks if they want to
+    # connect with this broker. Interested answers become leads (see /webhooks/bland/result).
+    from cloud_outreach import run_broker_leadgen
+    background_tasks.add_task(run_broker_leadgen, agent.id, req.target_area, req.limit)
+    return {"ok": True, "message": f"Calling property owners in {req.target_area} — interested ones will appear as leads."}
 
 
 def _run_outreach_task(agent_id: int, target_area: str, limit: int):
