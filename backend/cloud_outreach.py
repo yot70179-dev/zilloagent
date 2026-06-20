@@ -139,13 +139,17 @@ def _place_bland_call(phone: str) -> dict:
 
 PUBLIC_BASE_URL = os.getenv("PUBLIC_BASE_URL", "https://zilloagent-production.up.railway.app")
 
-OWNER_LEADGEN_TASK = (
-    "You are an assistant calling on behalf of a top local real estate agent. Politely and briefly ask the "
-    "person if they would be open to connecting with a local realtor who can help them sell their property or "
-    "has interested buyers. Be warm, natural, and under 60 seconds. If they show any interest or say yes, say "
-    "'Great — the agent will reach out to you shortly,' and confirm the best number to reach them. If they are "
-    "not interested, thank them politely and end the call. Do not be pushy."
-)
+def _leadgen_task(broker_name: str, broker_company: str) -> str:
+    who = broker_name or "a top local real estate agent"
+    org = f" of {broker_company}" if broker_company else ""
+    return (
+        f"You are a friendly assistant calling on behalf of {who}{org}, a local real estate agent. "
+        f"Politely and briefly ask the person if they own property in the area and would be open to "
+        f"connecting with {who} — who can help them sell or find interested buyers. Be warm, natural, "
+        f"and under 60 seconds. If they show any interest or say yes, say 'Great — {who} will reach out "
+        f"to you shortly,' and confirm the best phone number to reach them. If they are not interested, "
+        f"thank them politely and end the call. Do not be pushy."
+    )
 
 
 def run_broker_leadgen(broker_id: int, area: str, limit: int = 15) -> dict:
@@ -156,14 +160,27 @@ def run_broker_leadgen(broker_id: int, area: str, limit: int = 15) -> dict:
         logger.error("Missing keys — skipping leadgen for broker %s", broker_id)
         return {"placed": 0, "error": "missing_keys"}
 
+    # Personalize the call script with the broker's name/company
+    broker_name = broker_company = ""
+    try:
+        from database import Agent
+        _db = SessionLocal()
+        b = _db.query(Agent).filter(Agent.id == broker_id).first()
+        if b:
+            broker_name, broker_company = b.name or "", b.company or ""
+        _db.close()
+    except Exception as e:
+        logger.warning("Could not load broker %s for script: %s", broker_id, e)
+    task = _leadgen_task(broker_name, broker_company)
+
     contacts = _fetch_agent_phones(area, limit)
-    logger.info("Leadgen for broker %s in %s: %d contacts", broker_id, area, len(contacts))
+    logger.info("Leadgen for broker %s (%s) in %s: %d contacts", broker_id, broker_name, area, len(contacts))
     placed = 0
     key = os.getenv("BLANDAI_KEY", "")
     for c in contacts:
         body = {
             "phone_number": c["phone"],
-            "task": OWNER_LEADGEN_TASK,
+            "task": task,
             "voice": "nat",
             "max_duration": 2,
             "record": True,
