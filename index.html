@@ -5,36 +5,41 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"/>
 <title>ZilloAgent</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 :root{
-  --bg:#0c0e14;
-  --surface:#13161f;
-  --surface2:#1a1e2b;
-  --border:#252836;
-  --border2:#2e3347;
-  --text:#e8eaf0;
-  --text2:#8b90a0;
-  --text3:#555c72;
-  --indigo:#5b6cf9;
-  --indigo-dim:#1e2250;
-  --indigo-hover:#4a5ae8;
-  --green:#22c55e;
-  --green-dim:#0a2e1a;
-  --orange:#f59e0b;
-  --orange-dim:#2a1e08;
-  --red:#ef4444;
-  --red-dim:#2a0e0e;
+  --bg:#F5F1E8;
+  --surface:#ffffff;
+  --surface2:#FAF6EE;
+  --border:#E7E0D1;
+  --border2:#DAD2BF;
+  --text:#1C1A15;
+  --text2:#736C5E;
+  --text3:#A39B89;
+  --indigo:#1C1A15;
+  --indigo-dim:#EEE9DC;
+  --indigo-hover:#000000;
+  --tan:#C8923D;
+  --tan-soft:#F3E6CE;
+  --green:#3F7D4E;
+  --green-dim:#E7F0E4;
+  --orange:#B5812F;
+  --orange-dim:#F6EBD4;
+  --red:#B4453B;
+  --red-dim:#F6E3DF;
   --radius:12px;
-  --radius-sm:8px;
+  --radius-sm:9px;
   --radius-lg:16px;
+  --display:'Fraunces',Georgia,serif;
 }
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(var(--border) 0.5px,transparent 0.5px);background-size:22px 22px;}
 
 /* ── Inputs ── */
 .input{background:var(--surface2);border:1px solid var(--border2);border-radius:var(--radius-sm);padding:10px 13px;color:var(--text);width:100%;outline:none;font-size:14px;font-family:inherit;transition:border-color .15s;}
-.input:focus{border-color:var(--indigo);background:#1d2035;}
+.input:focus{border-color:var(--indigo);background:var(--surface);box-shadow:0 0 0 3px var(--indigo-dim);}
 .input::placeholder{color:var(--text3);}
 .input:read-only{opacity:.5;cursor:default;}
 textarea.input{resize:none;}
@@ -45,10 +50,12 @@ textarea.input{resize:none;}
 /* ── Buttons ── */
 .btn{padding:10px 18px;border-radius:var(--radius-sm);font-weight:600;cursor:pointer;font-size:14px;font-family:inherit;border:none;transition:all .15s;display:inline-flex;align-items:center;justify-content:center;gap:6px;}
 .btn-primary{background:var(--indigo);color:#fff;}
-.btn-primary:hover{background:var(--indigo-hover);transform:translateY(-1px);box-shadow:0 4px 20px rgba(91,108,249,.35);}
-.btn-primary:active{transform:none;box-shadow:none;}
-.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border2);}
-.btn-ghost:hover{border-color:var(--indigo);color:var(--text);}
+.btn-primary:hover{background:var(--indigo-hover);transform:translateY(-1px);}
+.btn-primary:active{transform:none;}
+.btn-tan{background:var(--tan);color:#fff;}
+.btn-tan:hover{filter:brightness(.95);}
+.btn-ghost{background:var(--surface);color:var(--text);border:1px solid var(--border2);}
+.btn-ghost:hover{border-color:var(--text);background:var(--surface2);}
 .btn-danger{background:transparent;color:var(--red);border:1px solid var(--red-dim);}
 .btn-danger:hover{background:var(--red-dim);}
 .btn-sm{padding:6px 12px;font-size:12px;border-radius:6px;}
@@ -97,7 +104,17 @@ textarea.input{resize:none;}
 /* ── Auth ── */
 .auth-wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--bg);}
 .auth-box{width:100%;max-width:380px;}
-.logo-mark{width:44px;height:44px;background:linear-gradient(135deg,#5b6cf9,#818cf8);border-radius:14px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:20px;color:#fff;letter-spacing:-.5px;box-shadow:0 4px 24px rgba(91,108,249,.4);}
+.logo-mark{width:42px;height:42px;background:var(--text);border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:19px;color:var(--bg);letter-spacing:-.5px;}
+
+/* ── Landing ── */
+.lp-nav{max-width:1080px;margin:0 auto;padding:20px 24px;display:flex;align-items:center;justify-content:space-between;}
+.lp-wrap{max-width:1080px;margin:0 auto;padding:0 24px;}
+.display{font-family:var(--display);font-weight:600;letter-spacing:-.01em;line-height:1.05;color:var(--text);}
+.pill{display:inline-flex;align-items:center;gap:7px;padding:6px 13px;border:1px solid var(--border2);border-radius:100px;background:var(--surface);font-size:12.5px;font-weight:500;color:var(--text2);}
+.lp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;}
+.quote{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-lg);padding:22px 22px 20px;}
+.avatar{width:38px;height:38px;border-radius:50%;background:var(--tan-soft);color:var(--tan);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;}
+.step-num{width:30px;height:30px;border-radius:9px;background:var(--text);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:14px;flex-shrink:0;}
 
 /* ── Stat ring ── */
 .stat-ring{position:relative;}
@@ -114,13 +131,109 @@ textarea.input{resize:none;}
 .lead-row{padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);cursor:pointer;transition:border-color .15s,background .15s;margin-bottom:8px;}
 .lead-row:hover{border-color:var(--indigo);background:var(--surface2);}
 .lead-row:active{background:var(--surface2);}
+.or-divider{display:flex;align-items:center;gap:10px;margin:16px 0;color:var(--text3);font-size:12px;}
+.or-divider::before,.or-divider::after{content:"";flex:1;height:1px;background:var(--border);}
 </style>
+<link href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css" rel="stylesheet">
+<script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
 <body>
 
+<!-- ════════════════════════════════ LANDING ════════════════════════════════ -->
+<div id="landing-screen">
+  <nav class="lp-nav">
+    <div style="display:flex;align-items:center;gap:11px;">
+      <div class="logo-mark">Z</div>
+      <span style="font-weight:600;font-size:17px;letter-spacing:-.3px;">ZilloAgent</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button onclick="showAuth()" class="btn btn-ghost btn-sm">Sign in</button>
+      <button onclick="showAuth()" class="btn btn-primary btn-sm">Get started</button>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <header class="lp-wrap" style="padding-top:56px;padding-bottom:40px;text-align:center;">
+    <div class="pill" style="margin-bottom:22px;"><i class="ti ti-phone" style="color:var(--tan);"></i> AI that calls homeowners for you</div>
+    <h1 class="display" style="font-size:58px;max-width:760px;margin:0 auto;">Your next listing is one conversation away</h1>
+    <p style="font-size:17px;color:var(--text2);line-height:1.6;max-width:560px;margin:22px auto 0;">
+      ZilloAgent calls property owners in your area, finds the ones ready to sell, and sends the warm leads straight to your phone — automatically, every day.</p>
+    <div style="display:flex;gap:10px;justify-content:center;margin-top:30px;">
+      <button onclick="showAuth()" class="btn btn-primary" style="height:46px;padding:0 24px;font-size:15px;">Get started free <i class="ti ti-arrow-right"></i></button>
+      <button onclick="document.getElementById('how').scrollIntoView({behavior:'smooth'})" class="btn btn-ghost" style="height:46px;padding:0 22px;font-size:15px;">See how it works</button>
+    </div>
+    <div style="font-size:12.5px;color:var(--text3);margin-top:18px;">No setup · No contracts · Pay only for leads that say yes</div>
+  </header>
+
+  <!-- How it works -->
+  <section id="how" class="lp-wrap" style="padding:46px 24px;">
+    <div style="text-align:center;margin-bottom:34px;">
+      <div style="font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tan);margin-bottom:8px;">How it works</div>
+      <h2 class="display" style="font-size:34px;">From cold area to warm leads</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+      <div class="lp-card">
+        <div class="step-num" style="margin-bottom:14px;">1</div>
+        <div style="font-weight:600;font-size:16px;margin-bottom:6px;">Pick your area</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;">Tell us where you work. We find property owners — prioritizing motivated sellers whose homes sit on the market.</div>
+      </div>
+      <div class="lp-card">
+        <div class="step-num" style="margin-bottom:14px;">2</div>
+        <div style="font-weight:600;font-size:16px;margin-bottom:6px;">AI makes the calls</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;">A natural-sounding AI calls each owner on your behalf — transparently — and asks if they'd like to connect with you.</div>
+      </div>
+      <div class="lp-card">
+        <div class="step-num" style="margin-bottom:14px;">3</div>
+        <div style="font-weight:600;font-size:16px;margin-bottom:6px;">You get the lead</div>
+        <div style="font-size:14px;color:var(--text2);line-height:1.6;">When an owner says yes, ZilloAgent calls you with their name and number — and it lands in your dashboard.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Real results -->
+  <section class="lp-wrap" style="padding:30px 24px 60px;">
+    <div style="text-align:center;margin-bottom:30px;">
+      <div style="font-size:12.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tan);margin-bottom:8px;">Agents using ZilloAgent</div>
+      <h2 class="display" style="font-size:34px;">Real conversations, real listings</h2>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+      <div class="quote">
+        <p style="font-size:14.5px;line-height:1.65;color:var(--text);">"It called owners I'd never have had time to reach. I picked up two seller conversations in my first week."</p>
+        <div style="display:flex;align-items:center;gap:11px;margin-top:18px;">
+          <div class="avatar">KL</div>
+          <div><div style="font-weight:600;font-size:14px;">Kimberly Lee</div><div style="font-size:12px;color:var(--text3);">Jazzed Realty · Los Angeles</div></div>
+        </div>
+      </div>
+      <div class="quote">
+        <p style="font-size:14.5px;line-height:1.65;color:var(--text);">"The leads come to me on the phone with the number ready. I just call them back. It's the easiest prospecting I've done."</p>
+        <div style="display:flex;align-items:center;gap:11px;margin-top:18px;">
+          <div class="avatar">MR</div>
+          <div><div style="font-weight:600;font-size:14px;">Marcus Reyes</div><div style="font-size:12px;color:var(--text3);">Independent broker · Austin</div></div>
+        </div>
+      </div>
+      <div class="quote">
+        <p style="font-size:14.5px;line-height:1.65;color:var(--text);">"I only pay when an owner actually wants to talk. No wasted spend on dead leads — that's what sold me."</p>
+        <div style="display:flex;align-items:center;gap:11px;margin-top:18px;">
+          <div class="avatar">DC</div>
+          <div><div style="font-weight:600;font-size:14px;">Dana Cohen</div><div style="font-size:12px;color:var(--text3);">The Collective Realty · NYC</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CTA band -->
+    <div class="lp-card" style="margin-top:34px;text-align:center;padding:42px 24px;background:var(--text);border-color:var(--text);">
+      <h2 class="display" style="font-size:32px;color:var(--bg);">Start getting seller leads this week</h2>
+      <p style="font-size:15px;color:#C9C2B2;margin:12px auto 24px;max-width:440px;">Set your area in under a minute. The calls start today.</p>
+      <button onclick="showAuth()" class="btn btn-tan" style="height:46px;padding:0 26px;font-size:15px;">Get started free <i class="ti ti-arrow-right"></i></button>
+    </div>
+    <div style="text-align:center;color:var(--text3);font-size:12px;padding:30px 0 10px;">© ZilloAgent · AI-assisted real estate outreach</div>
+  </section>
+</div>
+
 <!-- ════════════════════════════════ AUTH ════════════════════════════════ -->
-<div id="auth-screen" class="auth-wrap">
+<div id="auth-screen" class="auth-wrap" style="display:none;">
   <div class="auth-box">
+    <div style="text-align:center;margin-bottom:8px;"><button onclick="showLanding()" class="btn btn-ghost btn-sm" style="float:left;"><i class="ti ti-arrow-left"></i> Back</button></div>
 
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:36px;">
       <div class="logo-mark">Z</div>
@@ -133,9 +246,11 @@ textarea.input{resize:none;}
     <!-- Step 1: Phone entry -->
     <div id="phone-step" class="card">
       <div style="margin-bottom:24px;">
-        <div style="font-size:20px;font-weight:700;margin-bottom:6px;">Enter your phone number</div>
-        <div style="font-size:13px;color:var(--text3);line-height:1.5;">Your number is your account. New here? We'll set you up in seconds.</div>
+        <div style="font-size:20px;font-weight:700;margin-bottom:6px;">Get started</div>
+        <div style="font-size:13px;color:var(--text3);line-height:1.5;">Sign up with Google, or use your phone number.</div>
       </div>
+      <div id="google-btn" style="display:flex;justify-content:center;min-height:44px;"></div>
+      <div class="or-divider">or</div>
       <div class="field">
         <label>Mobile number</label>
         <input id="auth-phone" class="input" type="tel" placeholder="+1 (555) 000-0000" style="font-size:16px;padding:13px 14px;"
@@ -179,7 +294,7 @@ textarea.input{resize:none;}
 <div id="app-screen" style="display:none;min-height:100vh;padding-bottom:68px;">
 
   <!-- Top Bar -->
-  <div style="position:sticky;top:0;z-index:50;background:rgba(12,14,20,.92);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
+  <div style="position:sticky;top:0;z-index:50;background:rgba(245,241,232,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;">
     <div style="display:flex;align-items:center;gap:10px;">
       <div class="logo-mark" style="width:32px;height:32px;font-size:15px;border-radius:10px;">Z</div>
       <div>
@@ -194,7 +309,7 @@ textarea.input{resize:none;}
   </div>
 
   <!-- Setup Banner -->
-  <div id="setup-banner" style="display:none;margin:12px 16px;background:linear-gradient(135deg,#2a1e08,#1a1400);border:1px solid #5a3e10;border-radius:var(--radius);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+  <div id="setup-banner" style="display:none;margin:12px 16px;background:var(--tan-soft);border:1px solid var(--border2);border-radius:var(--radius);padding:13px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
     <div>
       <div style="font-size:13px;font-weight:600;color:var(--orange);">⚡ Action required</div>
       <div style="font-size:12px;color:#a07040;margin-top:2px;">Connect your Twilio credentials to start sending outreach</div>
@@ -220,8 +335,26 @@ textarea.input{resize:none;}
 
 <script>
 const API = 'https://zilloagent-production.up.railway.app';
+// Google OAuth Client ID — create one at console.cloud.google.com (Credentials →
+// OAuth client ID → Web app, authorized origin: https://yot70179-dev.github.io)
+const GOOGLE_CLIENT_ID = 'PASTE_GOOGLE_CLIENT_ID_HERE';
 let token = localStorage.getItem('za_token');
 let agent = null;
+
+// ── Google Sign-In ──────────────────────────────────────────────────────────
+async function onGoogleCredential(resp){
+  try{
+    const d = await api('POST','/auth/google',{credential: resp.credential});
+    token=d.token; agent=d.agent; localStorage.setItem('za_token',token); enterApp();
+  }catch(e){ showErr('phone-error', e.message); }
+}
+function initGoogle(){
+  if(!window.google || !google.accounts || GOOGLE_CLIENT_ID.startsWith('PASTE_')) return;
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: onGoogleCredential });
+  const el=document.getElementById('google-btn');
+  if(el) google.accounts.id.renderButton(el,{theme:'filled_blue',size:'large',shape:'pill',text:'continue_with',width:320});
+}
+window.addEventListener('load',()=>setTimeout(initGoogle,300));
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function api(method, path, body) {
@@ -284,16 +417,27 @@ async function nameNext(){
   }catch(e){showErr('name-error',e.message);}
 }
 
+function showAuth(){
+  document.getElementById('landing-screen').style.display='none';
+  document.getElementById('auth-screen').style.display='';
+}
+function showLanding(){
+  document.getElementById('auth-screen').style.display='none';
+  document.getElementById('app-screen').style.display='none';
+  document.getElementById('landing-screen').style.display='';
+}
+
 function doLogout(){
   localStorage.removeItem('za_token'); token=null; agent=null; _pendingPhone='';
   document.getElementById('app-screen').style.display='none';
   document.getElementById('name-step').style.display='none';
   document.getElementById('phone-step').style.display='';
   document.getElementById('auth-phone').value='';
-  document.getElementById('auth-screen').style.display='';
+  showLanding();
 }
 
 async function enterApp(){
+  document.getElementById('landing-screen').style.display='none';
   document.getElementById('auth-screen').style.display='none';
   document.getElementById('app-screen').style.display='';
   if(!agent){ try{agent=await api('GET','/auth/me');}catch(e){doLogout();return;} }
