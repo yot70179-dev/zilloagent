@@ -267,6 +267,46 @@ def send_code(req: SendCodeRequest, db: Session = Depends(get_db)):
     return {"sent": True, "existing": False}
 
 
+# Phrases that mean we reached a machine / answering service — never a lead
+_MACHINE_PHRASES = (
+    "record your name", "leave a message", "leave your message", "after the tone",
+    "after the beep", "is not available", "is unavailable", "not available right now",
+    "the person you are trying to reach", "your call has been forwarded", "voicemail",
+    "press 1", "press one", "press 2", "mailbox", "please leave", "google voice",
+    "to leave a callback", "currently unavailable", "can't take your call", "cannot take your call",
+)
+# A real affirmative must come from the USER's own words
+_USER_AFFIRM = (
+    "yes", "i'm interested", "im interested", "i am interested", "i'd be interested",
+    "id be interested", "sure", "sounds good", "tell me more", "i would", "definitely",
+    "absolutely", "please do", "go ahead", "that works", "sounds great", "okay yes",
+    "yeah i", "yes i", "i'm open", "im open", "happy to",
+)
+_USER_NEG = (
+    "not interested", "no thanks", "no thank you", "remove", "stop calling",
+    "don't call", "do not call", "take me off", "no i'm", "not right now",
+)
+
+
+def _is_genuine_interest(transcript: str) -> bool:
+    """True only if a real human said something affirmative — not a voicemail/IVR."""
+    if not transcript:
+        return False
+    low = transcript.lower()
+    if any(p in low for p in _MACHINE_PHRASES):
+        return False
+    # Look only at what the USER said (lines that start with "user:")
+    user_text = " ".join(
+        ln.split("user:", 1)[1].strip().lower()
+        for ln in transcript.splitlines() if ln.strip().lower().startswith("user:")
+    )
+    if not user_text or len(user_text) < 4:
+        return False
+    if any(n in user_text for n in _USER_NEG):
+        return False
+    return any(a in user_text for a in _USER_AFFIRM)
+
+
 @app.post("/webhooks/bland/result")
 async def bland_result(request: Request, db: Session = Depends(get_db)):
     """Bland calls this when a leadgen call ends. If the owner showed interest,
@@ -282,15 +322,10 @@ async def bland_result(request: Request, db: Session = Depends(get_db)):
 
     transcript = payload.get("concatenated_transcript") or payload.get("summary") or ""
     answered_by = payload.get("answered_by", "")
-    # Only consider real human conversations
     if answered_by == "voicemail":
         return {"ok": True, "skip": "voicemail"}
 
-    try:
-        from cloud_outreach import _sentiment
-        interested = _sentiment(transcript) == "POSITIVE"
-    except Exception:
-        interested = False
+    interested = _is_genuine_interest(transcript)
     if not interested:
         return {"ok": True, "interested": False}
 
