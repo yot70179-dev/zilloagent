@@ -61,7 +61,7 @@ def _start_outreach_scheduler():
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
-        from cloud_outreach import run_call_campaign, run_email_campaign, check_replies_and_call
+        from cloud_outreach import run_call_campaign, run_broker_leadgen, check_replies_and_call
     except Exception as e:
         logger.warning("Outreach scheduler not started (import failed): %s", e)
         return
@@ -72,25 +72,29 @@ def _start_outreach_scheduler():
 
     sched = BackgroundScheduler(timezone="UTC")
 
-    # 20 AI calls/day total, each at 10 AM that city's local time (DST-aware)
+    # ── Campaign 1: 15 calls/day to REALTORS pitching the ZilloAgent tool (10 AM local) ──
     for city, count, tz in [
-        ("New York, NY",     7, "America/New_York"),
-        ("Austin, TX",       6, "America/Chicago"),
-        ("Los Angeles, CA",  7, "America/Los_Angeles"),
+        ("New York, NY",     5, "America/New_York"),
+        ("Austin, TX",       5, "America/Chicago"),
+        ("Los Angeles, CA",  5, "America/Los_Angeles"),
     ]:
         sched.add_job(
             run_call_campaign, CronTrigger(hour=10, minute=0, timezone=tz),
-            args=[city, count], id=f"calls::{city}", replace_existing=True,
+            args=[city, count], id=f"toolpitch::{city}", replace_existing=True,
             misfire_grace_time=3600, coalesce=True,
         )
 
-    # Daily product-pitch emails (9 AM ET) — only if Gmail is configured
+    # ── Campaign 2: 10 calls/day to PROPERTY OWNERS offering Kimberly (noon LA = good hour) ──
+    sched.add_job(
+        run_broker_leadgen, CronTrigger(hour=12, minute=0, timezone="America/Los_Angeles"),
+        kwargs={"area": "Los Angeles, CA", "limit": 10,
+                "broker_name": "Kimberly R Lee", "broker_email": "all4kimly@gmail.com",
+                "broker_company": "Jazzed Realty, Inc."},
+        id="leadgen::kimberly", replace_existing=True, misfire_grace_time=3600, coalesce=True,
+    )
+
+    # Reply poll every 10 min (handles any email replies → AI call)
     if os.getenv("GMAIL_USER") and os.getenv("GMAIL_APP_PASSWORD"):
-        sched.add_job(
-            run_email_campaign, CronTrigger(hour=9, minute=0, timezone="America/New_York"),
-            id="emails::daily", replace_existing=True, misfire_grace_time=3600, coalesce=True,
-        )
-        # Check replies every 10 minutes → YES turns into an AI call automatically
         sched.add_job(
             check_replies_and_call, CronTrigger(minute="*/10"),
             id="replies::poll", replace_existing=True, misfire_grace_time=300, coalesce=True,
@@ -98,7 +102,7 @@ def _start_outreach_scheduler():
 
     sched.start()
     app.state.scheduler = sched
-    logger.info("Outreach scheduler started: calls (10 AM local), emails (9 AM ET), reply-poll every 10 min.")
+    logger.info("Scheduler: 15 realtor tool-pitch calls (10 AM local) + 10 owner lead-gen for Kimberly (noon LA), daily.")
 
 
 @app.get("/outreach/status")
@@ -350,25 +354,36 @@ async def bland_result(request: Request, db: Session = Depends(get_db)):
     else:
         lead = existing
 
-    # Notify the broker by email
-    broker = db.query(Agent).filter(Agent.id == broker_id).first()
-    to_email = (broker.gmail_user or broker.email) if broker else None
+    # Notify the broker by email (broker_email from metadata works even if the DB was wiped)
+    broker = db.query(Agent).filter(Agent.id == broker_id).first() if broker_id else None
+    to_email = meta.get("broker_email") or (broker.gmail_user or broker.email if broker else "")
     if to_email:
         try:
-            sender = MessageSender(broker)
-            sender.send_email(
-                to_email, broker.name or "",
-                "🔥 New interested lead from ZilloAgent",
-                f"Good news! A property owner is interested in connecting with you.\n\n"
-                f"Name:  {meta.get('owner_name','—')}\n"
-                f"Phone: {owner_phone}\n"
-                f"Property: {meta.get('address','—')} {meta.get('price','')}\n\n"
-                f"Reach out to them soon — they just said yes on the call. "
-                f"See full details in your ZilloAgent dashboard.",
-            )
+            _notify_broker_lead(to_email, meta, owner_phone)
         except Exception as e:
             logger.error("Broker notify email failed: %s", e)
     return {"ok": True, "interested": True, "lead_id": lead.id}
+
+
+def _notify_broker_lead(to_email: str, meta: dict, owner_phone: str):
+    """Send the broker an email about a newly interested lead (uses the platform Gmail)."""
+    user = os.getenv("GMAIL_USER", ""); pw = os.getenv("GMAIL_APP_PASSWORD", "")
+    if not user or not pw:
+        return
+    body = (
+        f"Good news! A property owner is interested in connecting with you.\n\n"
+        f"Name:  {meta.get('owner_name','—')}\n"
+        f"Phone: {owner_phone}\n"
+        f"Property: {meta.get('address','—')} {meta.get('price','')}\n\n"
+        f"They just said yes on the call — reach out to them soon. "
+        f"Full details are in your ZilloAgent dashboard."
+    )
+    msg = MIMEText(body)
+    msg["Subject"] = "🔥 New interested lead from ZilloAgent"
+    msg["From"] = f"ZilloAgent <{user}>"
+    msg["To"] = to_email
+    with smtplib.SMTP("smtp.gmail.com", 587) as s:
+        s.starttls(); s.login(user, pw); s.send_message(msg)
 
 
 @app.post("/auth/google")

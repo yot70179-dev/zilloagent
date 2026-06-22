@@ -64,7 +64,7 @@ CALL_TASK = (
 )
 
 
-def _fetch_agent_phones(city: str, limit: int) -> list[dict]:
+def _fetch_agent_phones(city: str, limit: int, mobile_only: bool = False) -> list[dict]:
     key = os.getenv("RAPIDAPI_KEY")
     if not key:
         logger.error("RAPIDAPI_KEY not set — cannot fetch agents")
@@ -89,7 +89,10 @@ def _fetch_agent_phones(city: str, limit: int) -> list[dict]:
             if not adv or not adv.get("phones"):
                 continue
             phones = adv["phones"]
-            mobile = next((p for p in phones if p.get("type") == "Mobile"), None) or phones[0]
+            mobile = next((p for p in phones if p.get("type") == "Mobile"), None)
+            if mobile_only and not mobile:
+                continue          # skip office-only lines (usually answering machines)
+            mobile = mobile or phones[0]
             num = mobile.get("number")
             if not num:
                 continue
@@ -152,29 +155,52 @@ def _leadgen_task(broker_name: str, broker_company: str) -> str:
     )
 
 
-def run_broker_leadgen(broker_id: int, area: str, limit: int = 15) -> dict:
-    """The moment a broker signs up: call property contacts in their area and ask if they want to
-    connect with a realtor. Bland reports each call result to /webhooks/bland/result, which turns
-    an interested answer into a lead for this broker."""
-    if not os.getenv("BLANDAI_KEY") or not os.getenv("RAPIDAPI_KEY"):
-        logger.error("Missing keys — skipping leadgen for broker %s", broker_id)
-        return {"placed": 0, "error": "missing_keys"}
-
-    # Personalize the call script with the broker's name/company
-    broker_name = broker_company = ""
+def _ensure_broker(email: str, name: str, company: str) -> int:
+    """Find or create a broker account by email (resilient to ephemeral DB). Returns its id."""
     try:
         from database import Agent
-        _db = SessionLocal()
-        b = _db.query(Agent).filter(Agent.id == broker_id).first()
-        if b:
-            broker_name, broker_company = b.name or "", b.company or ""
-        _db.close()
+        db = SessionLocal()
+        b = db.query(Agent).filter(Agent.email == email.lower()).first() if email else None
+        if not b:
+            b = Agent(name=name or (email.split("@")[0] if email else "Broker"),
+                      company=company or None, email=email.lower() if email else None,
+                      password_hash="", daily_sms_limit=350, daily_call_limit=20)
+            db.add(b); db.commit(); db.refresh(b)
+        bid = b.id
+        db.close()
+        return bid
     except Exception as e:
-        logger.warning("Could not load broker %s for script: %s", broker_id, e)
+        logger.warning("ensure_broker failed: %s", e)
+        return 0
+
+
+def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
+                       broker_name: str = "", broker_email: str = "", broker_company: str = "") -> dict:
+    """Call property owners in `area` and offer to connect them with this broker. Interested
+    answers become leads (see /webhooks/bland/result). Robust to DB wipes: the broker is
+    re-ensured by email, and broker_email rides in metadata so notification never depends on the DB."""
+    if not os.getenv("BLANDAI_KEY") or not os.getenv("RAPIDAPI_KEY"):
+        logger.error("Missing keys — skipping leadgen")
+        return {"placed": 0, "error": "missing_keys"}
+
+    # Resolve broker name/company/id (prefer explicit args; fall back to DB lookup by id)
+    if broker_email and not broker_id:
+        broker_id = _ensure_broker(broker_email, broker_name, broker_company)
+    if not broker_name and broker_id:
+        try:
+            from database import Agent
+            _db = SessionLocal()
+            b = _db.query(Agent).filter(Agent.id == broker_id).first()
+            if b:
+                broker_name, broker_company = b.name or "", b.company or ""
+                broker_email = broker_email or (b.email or "")
+            _db.close()
+        except Exception as e:
+            logger.warning("Could not load broker %s: %s", broker_id, e)
     task = _leadgen_task(broker_name, broker_company)
 
-    contacts = _fetch_agent_phones(area, limit)
-    logger.info("Leadgen for broker %s (%s) in %s: %d contacts", broker_id, broker_name, area, len(contacts))
+    contacts = _fetch_agent_phones(area, limit, mobile_only=True)   # mobiles only — fewer machines
+    logger.info("Leadgen broker=%s (%s) in %s: %d mobile contacts", broker_id, broker_name, area, len(contacts))
     placed = 0
     key = os.getenv("BLANDAI_KEY", "")
     for c in contacts:
@@ -188,6 +214,8 @@ def run_broker_leadgen(broker_id: int, area: str, limit: int = 15) -> dict:
             "webhook": f"{PUBLIC_BASE_URL}/webhooks/bland/result",
             "metadata": {
                 "broker_id": broker_id,
+                "broker_email": broker_email,
+                "broker_name": broker_name,
                 "owner_name": c.get("name", ""),
                 "owner_phone": c["phone"],
                 "address": c.get("address", ""),
