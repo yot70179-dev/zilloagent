@@ -89,7 +89,7 @@ def _start_outreach_scheduler():
         run_broker_leadgen, CronTrigger(hour=12, minute=0, timezone="America/Los_Angeles"),
         kwargs={"area": "Los Angeles, CA", "limit": 10,
                 "broker_name": "Kimberly R Lee", "broker_email": "all4kimly@gmail.com",
-                "broker_company": "Jazzed Realty, Inc."},
+                "broker_company": "Jazzed Realty, Inc.", "broker_phone": "+13232536190"},
         id="leadgen::kimberly", replace_existing=True, misfire_grace_time=3600, coalesce=True,
     )
 
@@ -334,10 +334,11 @@ async def bland_result(request: Request, background_tasks: BackgroundTasks, db: 
             return {"ok": True, "interested": False}
         rname  = meta.get("realtor_name", "")
         remail = meta.get("realtor_email", "")
+        rphone = meta.get("realtor_phone", "")
         rcity  = meta.get("city", "") or "Los Angeles, CA"
         from cloud_outreach import run_broker_leadgen
         # Immediately call 10 property owners in their area, offering this realtor
-        background_tasks.add_task(run_broker_leadgen, 0, rcity, 10, rname, remail, "")
+        background_tasks.add_task(run_broker_leadgen, 0, rcity, 10, rname, remail, "", rphone)
         if remail:
             try:
                 _notify_realtor_onboarded(remail, rname, rcity)
@@ -374,15 +375,25 @@ async def bland_result(request: Request, background_tasks: BackgroundTasks, db: 
     else:
         lead = existing
 
-    # Notify the broker by email (broker_email from metadata works even if the DB was wiped)
     broker = db.query(Agent).filter(Agent.id == broker_id).first() if broker_id else None
+
+    # PRIMARY hand-off: call the broker and give them the lead details by voice
+    broker_phone = meta.get("broker_phone") or (broker.phone if broker else "")
+    if broker_phone:
+        from cloud_outreach import call_broker_with_lead
+        background_tasks.add_task(
+            call_broker_with_lead, broker_phone, meta.get("broker_name", ""),
+            meta.get("owner_name", ""), owner_phone, meta.get("address", ""),
+        )
+
+    # Backup hand-off: email the broker too
     to_email = meta.get("broker_email") or (broker.gmail_user or broker.email if broker else "")
     if to_email:
         try:
             _notify_broker_lead(to_email, meta, owner_phone)
         except Exception as e:
             logger.error("Broker notify email failed: %s", e)
-    return {"ok": True, "interested": True, "lead_id": lead.id}
+    return {"ok": True, "interested": True, "lead_id": lead.id, "broker_called": bool(broker_phone)}
 
 
 def _notify_broker_lead(to_email: str, meta: dict, owner_phone: str):

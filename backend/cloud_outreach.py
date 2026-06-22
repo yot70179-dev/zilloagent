@@ -247,7 +247,8 @@ def _ensure_broker(email: str, name: str, company: str) -> int:
 
 
 def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
-                       broker_name: str = "", broker_email: str = "", broker_company: str = "") -> dict:
+                       broker_name: str = "", broker_email: str = "", broker_company: str = "",
+                       broker_phone: str = "") -> dict:
     """Call property owners in `area` and offer to connect them with this broker. Interested
     answers become leads (see /webhooks/bland/result). Robust to DB wipes: the broker is
     re-ensured by email, and broker_email rides in metadata so notification never depends on the DB."""
@@ -288,6 +289,7 @@ def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
                 "broker_id": broker_id,
                 "broker_email": broker_email,
                 "broker_name": broker_name,
+                "broker_phone": broker_phone,
                 "owner_name": c.get("name", ""),
                 "owner_phone": c["phone"],
                 "address": c.get("address", ""),
@@ -306,6 +308,36 @@ def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
         time.sleep(1.0)
     logger.info("Leadgen broker %s DONE: placed=%d calls", broker_id, placed)
     return {"placed": placed, "area": area}
+
+
+def call_broker_with_lead(broker_phone: str, broker_name: str, owner_name: str,
+                          owner_phone: str, address: str) -> dict:
+    """Place an AI call to the broker to hand off a newly interested property owner."""
+    key = os.getenv("BLANDAI_KEY", "")
+    if not key or not broker_phone:
+        return {"placed": False}
+    first = (broker_name or "there").split()[0]
+    digits = " ".join(list(owner_phone.replace("+", "")))  # read the number digit-by-digit
+    task = (
+        f"You are calling {first}, a real estate agent, to hand off a hot new lead. Say: 'Hi {first}, "
+        f"great news from ZilloAgent — a property owner just told us they're interested in connecting with you. "
+        f"Their name is {owner_name or 'a local owner'}"
+        + (f", their property is at {address}" if address else "")
+        + f". You can reach them at {owner_phone}. Want me to repeat the number?' If they say yes, slowly read "
+        f"the number digit by digit: {digits}. Keep it short, upbeat, under 45 seconds, then wish them luck and end."
+    )
+    body = {"phone_number": broker_phone, "task": task, "voice": "nat",
+            "max_duration": 2, "record": True, "answered_by_enabled": True}
+    try:
+        r = httpx.post("https://api.bland.ai/v1/calls",
+                       headers={"authorization": key, "Content-Type": "application/json"},
+                       json=body, timeout=20)
+        ok = bool(r.json().get("call_id"))
+        logger.info("Broker handoff call to %s placed=%s", broker_phone, ok)
+        return {"placed": ok}
+    except Exception as e:
+        logger.error("Broker handoff call failed %s: %s", broker_phone, e)
+        return {"placed": False}
 
 
 def run_call_campaign(city: str, count: int) -> dict:
