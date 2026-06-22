@@ -72,14 +72,14 @@ def _start_outreach_scheduler():
 
     sched = BackgroundScheduler(timezone="UTC")
 
-    # ── Campaign 1: 15 calls/day to REALTORS pitching the ZilloAgent tool (10 AM local) ──
+    # ── Campaign 1: 15 calls/day to REALTORS pitching the ZilloAgent tool (12 noon local) ──
     for city, count, tz in [
         ("New York, NY",     5, "America/New_York"),
         ("Austin, TX",       5, "America/Chicago"),
         ("Los Angeles, CA",  5, "America/Los_Angeles"),
     ]:
         sched.add_job(
-            run_call_campaign, CronTrigger(hour=10, minute=0, timezone=tz),
+            run_call_campaign, CronTrigger(hour=12, minute=0, timezone=tz),
             args=[city, count], id=f"toolpitch::{city}", replace_existing=True,
             misfire_grace_time=3600, coalesce=True,
         )
