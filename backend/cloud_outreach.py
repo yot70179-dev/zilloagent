@@ -242,18 +242,36 @@ def run_call_campaign(city: str, count: int) -> dict:
         logger.error("Missing BLANDAI_KEY/RAPIDAPI_KEY — skipping call campaign for %s", city)
         return {"city": city, "placed": 0, "failed": 0, "error": "missing_keys"}
 
-    agents = _fetch_agent_phones(city, count)
-    logger.info("Cloud campaign %s: fetched %d agents", city, len(agents))
+    agents = _fetch_agent_phones(city, count, mobile_only=True)
+    logger.info("Cloud campaign %s: fetched %d realtor mobiles", city, len(agents))
     placed = failed = 0
+    key = os.getenv("BLANDAI_KEY", "")
     for a in agents:
+        # Tool-pitch call WITH a webhook + metadata so a "yes" auto-onboards the realtor
+        body = {
+            "phone_number": a["phone"],
+            "task": CALL_TASK,
+            "voice": "nat",
+            "max_duration": 3,
+            "record": True,
+            "answered_by_enabled": True,
+            "webhook": f"{PUBLIC_BASE_URL}/webhooks/bland/result",
+            "metadata": {
+                "type": "toolpitch",
+                "realtor_name": a.get("name", ""),
+                "realtor_phone": a["phone"],
+                "realtor_email": a.get("email", ""),
+                "city": a.get("city", "") or city,
+            },
+        }
         try:
-            res = _place_bland_call(a["phone"])
-            if res.get("call_id"):
+            r = httpx.post("https://api.bland.ai/v1/calls",
+                           headers={"authorization": key, "Content-Type": "application/json"},
+                           json=body, timeout=20)
+            if r.json().get("call_id"):
                 placed += 1
-                logger.info("Called %s %s id=%s", a["name"], a["phone"], res["call_id"])
             else:
                 failed += 1
-                logger.warning("Call failed %s: %s", a["phone"], res)
         except Exception as e:
             failed += 1
             logger.error("Call error %s: %s", a["phone"], e)

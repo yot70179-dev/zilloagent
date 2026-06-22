@@ -312,24 +312,44 @@ def _is_genuine_interest(transcript: str) -> bool:
 
 
 @app.post("/webhooks/bland/result")
-async def bland_result(request: Request, db: Session = Depends(get_db)):
-    """Bland calls this when a leadgen call ends. If the owner showed interest,
-    create a lead for the broker and notify them (dashboard + email)."""
+async def bland_result(request: Request, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Bland calls this when a call ends.
+    - toolpitch call: a realtor said yes → auto-onboard them + start owner lead-gen in their area.
+    - leadgen call: an owner said yes → create a lead for the broker and notify them."""
     try:
         payload = await request.json()
     except Exception:
         return {"ok": False}
     meta = payload.get("metadata") or {}
-    broker_id = meta.get("broker_id")
-    if not broker_id:
-        return {"ok": True, "skip": "no broker_id"}
-
     transcript = payload.get("concatenated_transcript") or payload.get("summary") or ""
     answered_by = payload.get("answered_by", "")
     if answered_by == "voicemail":
         return {"ok": True, "skip": "voicemail"}
 
     interested = _is_genuine_interest(transcript)
+
+    # ── Realtor said YES to the tool → onboard them and start their lead-gen ──
+    if meta.get("type") == "toolpitch":
+        if not interested:
+            return {"ok": True, "interested": False}
+        rname  = meta.get("realtor_name", "")
+        remail = meta.get("realtor_email", "")
+        rcity  = meta.get("city", "") or "Los Angeles, CA"
+        from cloud_outreach import run_broker_leadgen
+        # Immediately call 10 property owners in their area, offering this realtor
+        background_tasks.add_task(run_broker_leadgen, 0, rcity, 10, rname, remail, "")
+        if remail:
+            try:
+                _notify_realtor_onboarded(remail, rname, rcity)
+            except Exception as e:
+                logger.error("Realtor onboard email failed: %s", e)
+        logger.info("Onboarded realtor %s (%s) — starting 10 owner calls in %s", rname, remail, rcity)
+        return {"ok": True, "onboarded": rname, "area": rcity}
+
+    # ── Owner said YES → lead for the broker ──
+    broker_id = meta.get("broker_id")
+    if not broker_id:
+        return {"ok": True, "skip": "no broker_id"}
     if not interested:
         return {"ok": True, "interested": False}
 
@@ -381,6 +401,27 @@ def _notify_broker_lead(to_email: str, meta: dict, owner_phone: str):
     msg = MIMEText(body)
     msg["Subject"] = "🔥 New interested lead from ZilloAgent"
     msg["From"] = f"ZilloAgent <{user}>"
+    msg["To"] = to_email
+    with smtplib.SMTP("smtp.gmail.com", 587) as s:
+        s.starttls(); s.login(user, pw); s.send_message(msg)
+
+
+def _notify_realtor_onboarded(to_email: str, name: str, city: str):
+    """Welcome a realtor who said yes — their lead-gen just started."""
+    user = os.getenv("GMAIL_USER", ""); pw = os.getenv("GMAIL_APP_PASSWORD", "")
+    if not user or not pw:
+        return
+    first = (name or "there").split()[0]
+    body = (
+        f"Hi {first},\n\nGreat to connect! You're now set up with ZilloAgent.\n\n"
+        f"We've already started calling property owners in {city} on your behalf — "
+        f"every owner who's interested will be sent straight to you with their number.\n\n"
+        f"Sign in to see your leads as they come in: https://yot70179-dev.github.io/zilloagent/\n\n"
+        f"Best,\nAlex - ZilloAgent"
+    )
+    msg = MIMEText(body)
+    msg["Subject"] = "Welcome to ZilloAgent — your leads are on the way"
+    msg["From"] = f"Alex - ZilloAgent <{user}>"
     msg["To"] = to_email
     with smtplib.SMTP("smtp.gmail.com", 587) as s:
         s.starttls(); s.login(user, pw); s.send_message(msg)
