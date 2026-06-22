@@ -121,6 +121,78 @@ def _fetch_agent_phones(city: str, limit: int, mobile_only: bool = False) -> lis
     return agents[:limit]
 
 
+def _days_on_market(list_date: str) -> int:
+    if not list_date:
+        return 0
+    try:
+        dt = datetime.strptime(list_date[:19], "%Y-%m-%dT%H:%M:%S")
+        return max(0, (datetime.utcnow() - dt).days)
+    except Exception:
+        return 0
+
+
+def _fetch_motivated_owners(city: str, limit: int) -> list[dict]:
+    """Find sellers most likely to want help: longest time on market and/or price-reduced.
+    Mobile numbers only. Returns mostly stale listings plus a couple of fresher ones."""
+    key = os.getenv("RAPIDAPI_KEY")
+    if not key:
+        return []
+    headers = {"x-rapidapi-key": key, "x-rapidapi-host": RAPIDAPI_HOST}
+    pool, seen = [], set()
+    for offset in range(0, 300, 50):
+        try:
+            r = httpx.get(f"https://{RAPIDAPI_HOST}/for-sale", headers=headers,
+                          params={"location": city, "offset": offset, "limit": 50, "sort": "relevance"},
+                          timeout=25)
+            listings = r.json().get("listings") or []
+        except Exception as e:
+            logger.error("motivated fetch error %s: %s", city, e); break
+        if not listings:
+            break
+        for listing in listings:
+            advs = listing.get("advertisers") or []
+            adv = next((a for a in advs if a.get("type") == "seller"), None) or (advs[0] if advs else None)
+            if not adv or not adv.get("phones"):
+                continue
+            mobile = next((p for p in adv["phones"] if p.get("type") == "Mobile"), None)
+            if not mobile or not mobile.get("number"):
+                continue   # mobiles only — real numbers
+            digits = "".join(c for c in str(mobile["number"]) if c.isdigit())
+            if len(digits) == 10:
+                digits = "1" + digits
+            if len(digits) != 11:
+                continue
+            phone = "+" + digits
+            if phone in seen:
+                continue
+            seen.add(phone)
+            days = _days_on_market(listing.get("list_date", ""))
+            reduced = bool(listing.get("price_reduced_date")) or bool((listing.get("flags") or {}).get("is_price_reduced"))
+            loc = (listing.get("location") or {}).get("address") or {}
+            pool.append({
+                "phone": phone, "name": adv.get("name", ""), "email": adv.get("email", ""),
+                "address": loc.get("line", ""), "price": listing.get("list_price", ""),
+                "city": loc.get("city", "") or city,
+                "_score": days + (45 if reduced else 0), "_days": days,
+            })
+        time.sleep(0.6)
+    if not pool:
+        return []
+    # Mostly the most motivated (stale / price-reduced); include a couple of fresher ones for variety
+    pool.sort(key=lambda x: x["_score"], reverse=True)
+    motivated = pool[:max(1, limit - 2)]
+    fresh = sorted(pool, key=lambda x: x["_days"])[:2]
+    out, picked = [], set()
+    for c in motivated + fresh:
+        if c["phone"] in picked:
+            continue
+        picked.add(c["phone"]); out.append(c)
+        if len(out) >= limit:
+            break
+    logger.info("Motivated owners in %s: %d (top days-on-market=%d)", city, len(out), out[0]["_days"] if out else 0)
+    return out[:limit]
+
+
 def _place_bland_call(phone: str) -> dict:
     key = os.getenv("BLANDAI_KEY", "")
     body = {
@@ -199,8 +271,8 @@ def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
             logger.warning("Could not load broker %s: %s", broker_id, e)
     task = _leadgen_task(broker_name, broker_company)
 
-    contacts = _fetch_agent_phones(area, limit, mobile_only=True)   # mobiles only — fewer machines
-    logger.info("Leadgen broker=%s (%s) in %s: %d mobile contacts", broker_id, broker_name, area, len(contacts))
+    contacts = _fetch_motivated_owners(area, limit)   # long-on-market / price-reduced sellers, mobiles only
+    logger.info("Leadgen broker=%s (%s) in %s: %d motivated owners", broker_id, broker_name, area, len(contacts))
     placed = 0
     key = os.getenv("BLANDAI_KEY", "")
     for c in contacts:
