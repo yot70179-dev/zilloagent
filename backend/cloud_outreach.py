@@ -340,6 +340,10 @@ def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
             "max_duration": 2,
             "record": True,
             "answered_by_enabled": True,
+            "voicemail_action": "leave_message",
+            "voicemail_message": (f"Hi, this is an assistant reaching out on behalf of "
+                f"{broker_name or 'a local real estate agent'}. If you've been thinking about selling your "
+                f"property, they'd be glad to help — no pressure at all. Have a great day."),
             "webhook": f"{PUBLIC_BASE_URL}/webhooks/bland/result",
             "metadata": {
                 "broker_id": broker_id,
@@ -415,6 +419,10 @@ def run_call_campaign(city: str, count: int) -> dict:
             "max_duration": 3,
             "record": True,
             "answered_by_enabled": True,
+            "voicemail_action": "leave_message",
+            "voicemail_message": ("Hi, this is Alex, founder of ZilloAgent. I built a free AI tool that "
+                "automatically finds real estate agents new seller leads. I'd love to give you free access — "
+                "check it out at zilloagent dot io, or I'll try you again. Thanks!"),
             "webhook": f"{PUBLIC_BASE_URL}/webhooks/bland/result",
             "metadata": {
                 "type": "toolpitch",
