@@ -73,11 +73,11 @@ def _start_outreach_scheduler():
 
     sched = BackgroundScheduler(timezone="UTC")
 
-    # ── 15 calls/day to REALTORS pitching the tool, at 10 AM each city's local time ──
+    # ── 25 calls/day to REALTORS pitching the tool, at 10 AM each city's local time ──
     for city, count, tz in [
-        ("New York, NY",     5, "America/New_York"),
-        ("Austin, TX",       5, "America/Chicago"),
-        ("Los Angeles, CA",  5, "America/Los_Angeles"),
+        ("New York, NY",     9, "America/New_York"),
+        ("Austin, TX",       8, "America/Chicago"),
+        ("Los Angeles, CA",  8, "America/Los_Angeles"),
     ]:
         sched.add_job(
             run_call_campaign, CronTrigger(hour=10, minute=0, timezone=tz),
@@ -85,10 +85,10 @@ def _start_outreach_scheduler():
             misfire_grace_time=3600, coalesce=True,
         )
 
-    # ── 15 owner lead-gen calls/day for EVERY signed-up broker (incl. Kimberly), 10 AM PT ──
+    # ── 25 owner lead-gen calls/day for EVERY signed-up broker (incl. Kimberly), 10 AM PT ──
     sched.add_job(
         run_all_brokers, CronTrigger(hour=10, minute=0, timezone="America/Los_Angeles"),
-        kwargs={"limit_per_broker": 15}, id="leadgen::all-brokers",
+        kwargs={"limit_per_broker": 25}, id="leadgen::all-brokers",
         replace_existing=True, misfire_grace_time=3600, coalesce=True,
     )
 
