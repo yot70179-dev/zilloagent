@@ -61,7 +61,8 @@ def _start_outreach_scheduler():
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
         from apscheduler.triggers.cron import CronTrigger
-        from cloud_outreach import run_call_campaign, run_broker_leadgen, check_replies_and_call
+        from cloud_outreach import (run_call_campaign, run_all_brokers,
+                                     call_kimberly_checkin, check_replies_and_call)
     except Exception as e:
         logger.warning("Outreach scheduler not started (import failed): %s", e)
         return
@@ -72,25 +73,29 @@ def _start_outreach_scheduler():
 
     sched = BackgroundScheduler(timezone="UTC")
 
-    # ── Campaign 1: 15 calls/day to REALTORS pitching the ZilloAgent tool (12 noon local) ──
+    # ── 15 calls/day to REALTORS pitching the tool, at 10 AM each city's local time ──
     for city, count, tz in [
         ("New York, NY",     5, "America/New_York"),
         ("Austin, TX",       5, "America/Chicago"),
         ("Los Angeles, CA",  5, "America/Los_Angeles"),
     ]:
         sched.add_job(
-            run_call_campaign, CronTrigger(hour=12, minute=0, timezone=tz),
+            run_call_campaign, CronTrigger(hour=10, minute=0, timezone=tz),
             args=[city, count], id=f"toolpitch::{city}", replace_existing=True,
             misfire_grace_time=3600, coalesce=True,
         )
 
-    # ── Campaign 2: 10 calls/day to PROPERTY OWNERS offering Kimberly (noon LA = good hour) ──
+    # ── 15 owner lead-gen calls/day for EVERY signed-up broker (incl. Kimberly), 10 AM PT ──
     sched.add_job(
-        run_broker_leadgen, CronTrigger(hour=12, minute=0, timezone="America/Los_Angeles"),
-        kwargs={"area": "Los Angeles, CA", "limit": 10,
-                "broker_name": "Kimberly R Lee", "broker_email": "all4kimly@gmail.com",
-                "broker_company": "Jazzed Realty, Inc.", "broker_phone": "+13232536190"},
-        id="leadgen::kimberly", replace_existing=True, misfire_grace_time=3600, coalesce=True,
+        run_all_brokers, CronTrigger(hour=10, minute=0, timezone="America/Los_Angeles"),
+        kwargs={"limit_per_broker": 15}, id="leadgen::all-brokers",
+        replace_existing=True, misfire_grace_time=3600, coalesce=True,
+    )
+
+    # ── Daily check-in call to Kimberly: "any clients thanks to the tool?" (11 AM PT) ──
+    sched.add_job(
+        call_kimberly_checkin, CronTrigger(hour=11, minute=0, timezone="America/Los_Angeles"),
+        id="checkin::kimberly", replace_existing=True, misfire_grace_time=3600, coalesce=True,
     )
 
     # Reply poll every 10 min (handles any email replies → AI call)

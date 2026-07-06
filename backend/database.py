@@ -68,6 +68,9 @@ class Agent(Base):
     # RapidAPI — agent's own key (optional; falls back to env)
     rapidapi_key   = Column(String(200), nullable=True)
 
+    # Lead-gen: the area this broker wants owner leads from (drives daily auto-calls)
+    target_area      = Column(String(120), nullable=True)
+
     # Daily limits
     daily_sms_limit  = Column(Integer, default=350)
     daily_call_limit = Column(Integer, default=20)

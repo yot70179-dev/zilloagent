@@ -230,8 +230,9 @@ def _leadgen_task(broker_name: str, broker_company: str) -> str:
     )
 
 
-def _ensure_broker(email: str, name: str, company: str) -> int:
-    """Find or create a broker account by email (resilient to ephemeral DB). Returns its id."""
+def _ensure_broker(email: str, name: str, company: str, target_area: str = "", phone: str = "") -> int:
+    """Find or create a broker account by email (resilient to ephemeral DB). Returns its id.
+    Also records the broker's target_area/phone so the daily job can call for them."""
     try:
         from database import Agent
         db = SessionLocal()
@@ -239,14 +240,66 @@ def _ensure_broker(email: str, name: str, company: str) -> int:
         if not b:
             b = Agent(name=name or (email.split("@")[0] if email else "Broker"),
                       company=company or None, email=email.lower() if email else None,
+                      phone=phone or None, target_area=target_area or None,
                       password_hash="", daily_sms_limit=350, daily_call_limit=20)
             db.add(b); db.commit(); db.refresh(b)
+        else:
+            if target_area and not b.target_area: b.target_area = target_area
+            if phone and not b.phone: b.phone = phone
+            db.commit()
         bid = b.id
         db.close()
         return bid
     except Exception as e:
         logger.warning("ensure_broker failed: %s", e)
         return 0
+
+
+def run_all_brokers(limit_per_broker: int = 15) -> dict:
+    """Daily: for every broker with a target area, place owner lead-gen calls that offer them.
+    Kimberly is always included. Interested owners are handed off (see /webhooks/bland/result)."""
+    # Make sure Kimberly always has a live account with her area/phone
+    _ensure_broker("all4kimly@gmail.com", "Kimberly R Lee", "Jazzed Realty, Inc.",
+                   target_area="Los Angeles, CA", phone="+13232536190")
+    try:
+        from database import Agent
+        db = SessionLocal()
+        brokers = db.query(Agent).filter(Agent.is_active == True, Agent.target_area != None).all()
+        info = [(b.id, b.target_area, b.name or "", b.email or "", b.company or "", b.phone or "") for b in brokers]
+        db.close()
+    except Exception as e:
+        logger.error("run_all_brokers query failed: %s", e)
+        return {"brokers": 0}
+    total = 0
+    for bid, area, name, email, company, phone in info:
+        r = run_broker_leadgen(bid, area, limit_per_broker, name, email, company, phone)
+        total += r.get("placed", 0)
+    logger.info("run_all_brokers: %d brokers, %d owner calls placed", len(info), total)
+    return {"brokers": len(info), "placed": total}
+
+
+def call_kimberly_checkin() -> dict:
+    """Daily: call Kimberly once and ask if she has landed any clients thanks to the tool."""
+    key = os.getenv("BLANDAI_KEY", "")
+    if not key:
+        return {"placed": False}
+    task = (
+        "You are calling Kimberly, a real estate agent, on behalf of ZilloAgent for a friendly check-in. "
+        "Say: 'Hi Kimberly, it's ZilloAgent checking in. Have you landed any new clients or listings thanks "
+        "to the leads we've been sending you?' Listen to her answer warmly. If she has, congratulate her and "
+        "ask if she'd like more. If not yet, reassure her more leads are on the way. Keep it under 45 seconds, "
+        "friendly, then thank her and end."
+    )
+    body = {"phone_number": "+13232536190", "task": task, "voice": "nat",
+            "max_duration": 2, "record": True, "answered_by_enabled": True}
+    try:
+        r = httpx.post("https://api.bland.ai/v1/calls",
+                       headers={"authorization": key, "Content-Type": "application/json"},
+                       json=body, timeout=20)
+        return {"placed": bool(r.json().get("call_id"))}
+    except Exception as e:
+        logger.error("Kimberly check-in call failed: %s", e)
+        return {"placed": False}
 
 
 def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
@@ -261,7 +314,7 @@ def run_broker_leadgen(broker_id: int = 0, area: str = "", limit: int = 15,
 
     # Resolve broker name/company/id (prefer explicit args; fall back to DB lookup by id)
     if broker_email and not broker_id:
-        broker_id = _ensure_broker(broker_email, broker_name, broker_company)
+        broker_id = _ensure_broker(broker_email, broker_name, broker_company, area, broker_phone)
     if not broker_name and broker_id:
         try:
             from database import Agent
