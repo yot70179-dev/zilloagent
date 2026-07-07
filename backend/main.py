@@ -71,6 +71,11 @@ def _start_outreach_scheduler():
         logger.warning("Outreach scheduler idle — set BLANDAI_KEY and RAPIDAPI_KEY on Railway to enable.")
         return
 
+    # PAUSED: all automatic calls are stopped. Set OUTREACH_ENABLED=true on Railway to resume.
+    if os.getenv("OUTREACH_ENABLED", "false").lower() != "true":
+        logger.info("Outreach scheduler PAUSED — no automatic calls. Set OUTREACH_ENABLED=true to resume.")
+        return
+
     sched = BackgroundScheduler(timezone="UTC")
 
     # ── 25 calls/day to REALTORS pitching the tool, at 10 AM each city's local time ──
