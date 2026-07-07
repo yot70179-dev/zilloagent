@@ -202,6 +202,9 @@ def _place_bland_call(phone: str) -> dict:
         "max_duration": 3,
         "record": True,
         "answered_by_enabled": True,
+        "voicemail_action": "leave_message",
+        "voicemail_message": ("Hi, this is Alex from ZilloAgent. I've got a free AI tool that finds real estate "
+            "agents new seller leads automatically. Check it out at zilloagent, or I'll try you again. Thanks!"),
     }
     r = httpx.post(
         "https://api.bland.ai/v1/calls",
@@ -291,7 +294,10 @@ def call_kimberly_checkin() -> dict:
         "friendly, then thank her and end."
     )
     body = {"phone_number": "+13232536190", "task": task, "voice": "nat",
-            "max_duration": 2, "record": True, "answered_by_enabled": True}
+            "max_duration": 2, "record": True, "answered_by_enabled": True,
+            "voicemail_action": "leave_message",
+            "voicemail_message": ("Hi Kimberly, it's ZilloAgent checking in. Let us know if you've landed any "
+                "clients from the leads we've sent — and more are on the way. Have a great day!")}
     try:
         r = httpx.post("https://api.bland.ai/v1/calls",
                        headers={"authorization": key, "Content-Type": "application/json"},
@@ -386,8 +392,12 @@ def call_broker_with_lead(broker_phone: str, broker_name: str, owner_name: str,
         + f". You can reach them at {owner_phone}. Want me to repeat the number?' If they say yes, slowly read "
         f"the number digit by digit: {digits}. Keep it short, upbeat, under 45 seconds, then wish them luck and end."
     )
+    vm = (f"Hi {first}, this is ZilloAgent with a new lead. A property owner named "
+          f"{owner_name or 'a local owner'} is interested in connecting with you. Reach them at "
+          f"{owner_phone}. Again, that's {digits}. Good luck!")
     body = {"phone_number": broker_phone, "task": task, "voice": "nat",
-            "max_duration": 2, "record": True, "answered_by_enabled": True}
+            "max_duration": 2, "record": True, "answered_by_enabled": True,
+            "voicemail_action": "leave_message", "voicemail_message": vm}
     try:
         r = httpx.post("https://api.bland.ai/v1/calls",
                        headers={"authorization": key, "Content-Type": "application/json"},
