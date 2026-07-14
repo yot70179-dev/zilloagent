@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>ReelTour — property tour studio</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+:root{--bg:#ffffff;--panel:#f6f6f7;--panel2:#fafafa;--line:#e6e6e9;--ink:#191919;--muted:#6d6d73;--accent:#1f1f1f;--radius:14px;}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--ink);height:100vh;overflow:hidden;}
+.top{height:58px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 22px;}
+.logo{display:flex;align-items:center;gap:10px;font-weight:600;font-size:17px;}
+.mark{width:32px;height:32px;border-radius:9px;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;}
+.wrap{display:grid;grid-template-columns:360px 1fr 320px;height:calc(100vh - 58px);}
+.col{padding:18px;overflow-y:auto;}
+.col.mid{background:var(--panel2);border-left:1px solid var(--line);border-right:1px solid var(--line);}
+.h{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:10px;}
+.drop{border:1.5px dashed var(--line);border-radius:12px;padding:22px;text-align:center;color:var(--muted);cursor:pointer;font-size:13px;transition:.15s;}
+.drop:hover,.drop.over{border-color:var(--accent);color:var(--ink);background:var(--panel);}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;}
+.thumb{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:#eee;}
+.thumb img{width:100%;height:100%;object-fit:cover;}
+.thumb .x{position:absolute;top:3px;right:3px;width:18px;height:18px;background:rgba(0,0,0,.6);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:11px;line-height:1;}
+.count{font-size:12px;color:var(--muted);margin-top:8px;}
+/* chat */
+.chat{display:flex;flex-direction:column;height:100%;}
+.msgs{flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:10px;padding-right:4px;}
+.bub{max-width:88%;padding:10px 13px;border-radius:13px;font-size:14px;line-height:1.5;}
+.bot{background:var(--panel);align-self:flex-start;border:1px solid var(--line);border-bottom-left-radius:4px;}
+.me{background:var(--accent);color:#fff;align-self:flex-end;border-bottom-right-radius:4px;}
+.chip{display:inline-block;font-size:12px;padding:6px 11px;border:1px solid var(--line);border-radius:100px;background:#fff;cursor:pointer;margin:4px 4px 0 0;}
+.chip:hover{border-color:var(--accent);}
+.cin{display:flex;gap:8px;margin-top:10px;}
+.cin input{flex:1;padding:11px 13px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:14px;outline:none;}
+.cin input:focus{border-color:var(--accent);}
+.btn{background:var(--accent);color:#fff;border:none;border-radius:10px;padding:11px 16px;font-weight:600;cursor:pointer;font-size:14px;font-family:inherit;}
+.btn:disabled{opacity:.4;cursor:default;}
+.btn.block{width:100%;margin-top:14px;padding:13px;}
+.stage{background:#111;border-radius:12px;overflow:hidden;aspect-ratio:16/9;}
+canvas{width:100%;height:100%;display:block;}
+a.dl{display:none;margin-top:12px;background:var(--accent);color:#fff;text-decoration:none;padding:12px;border-radius:10px;text-align:center;font-weight:600;}
+.field{margin-bottom:10px;} .field input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;font-size:13px;outline:none;}
+.field input:focus{border-color:var(--accent);}
+label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
+.st{font-size:12px;color:var(--muted);margin-top:8px;}
+</style></head><body>
+<div class="top">
+  <div class="logo"><div class="mark">▶</div> ReelTour</div>
+  <div style="font-size:13px;color:var(--muted);">Property tour studio</div>
+</div>
+<div class="wrap">
+  <!-- LEFT: photos + details -->
+  <div class="col">
+    <div class="h">1 · Photos <span style="float:right;font-weight:400;text-transform:none;">up to 20</span></div>
+    <div id="drop" class="drop"><div style="font-size:22px;margin-bottom:4px;">⬆︎</div>Drop room photos<br><span style="font-size:11px;">or click to browse</span></div>
+    <input id="file" type="file" accept="image/*" multiple hidden>
+    <div id="thumbs" class="thumbs"></div>
+    <div class="count" id="count">0 / 20 photos</div>
+    <div class="h" style="margin-top:22px;">Listing details</div>
+    <div class="field"><label>Title</label><input id="title" value="Modern Family Home"></div>
+    <div class="field"><label>Location · price</label><input id="loc" value="Los Angeles · $2,000,000"></div>
+    <div class="field"><label>Agent</label><input id="agent" value="Your Name · Your Realty"></div>
+  </div>
+  <!-- MID: chat -->
+  <div class="col mid">
+    <div class="chat">
+      <div class="h">2 · Tell me the vibe</div>
+      <div class="msgs" id="msgs"></div>
+      <div>
+        <div id="chips"></div>
+        <div class="cin"><input id="cinput" placeholder="e.g. slow luxury tour, 30 seconds" onkeydown="if(event.key==='Enter')send()"><button class="btn" onclick="send()">Send</button></div>
+      </div>
+      <button class="btn block" id="go" onclick="generate()" disabled>🎬 Create tour</button>
+    </div>
+  </div>
+  <!-- RIGHT: preview -->
+  <div class="col">
+    <div class="h">3 · Preview</div>
+    <div class="stage"><canvas id="cv" width="1280" height="720"></canvas></div>
+    <a id="dl" class="dl">⬇ Download tour</a>
+    <div class="st" id="st"></div>
+    <div class="st" style="margin-top:14px;">Free tier renders a cinematic pan tour in your browser. Pro adds real AI 3D camera motion (Higgsfield) per room.</div>
+  </div>
+</div>
+<script>
+const cv=document.getElementById('cv'),x=cv.getContext('2d'),W=1280,H=720;
+let photos=[]; const cfg={style:'cinematic',seconds:30};
+const $=id=>document.getElementById(id);
+// ---- chat ----
+function bot(t){const d=document.createElement('div');d.className='bub bot';d.textContent=t;$('msgs').appendChild(d);$('msgs').scrollTop=1e9;}
+function me(t){const d=document.createElement('div');d.className='bub me';d.textContent=t;$('msgs').appendChild(d);$('msgs').scrollTop=1e9;}
+function chips(arr){const c=$('chips');c.innerHTML='';arr.forEach(a=>{const s=document.createElement('span');s.className='chip';s.textContent=a;s.onclick=()=>{me(a);handle(a);};c.appendChild(s);});}
+bot("Hi! Upload your room photos, then tell me the style and length — e.g. \"slow luxury tour, 30 seconds\". You can also pick below.");
+chips(['Slow & luxurious','Bright & energetic','Cinematic & moody','20 seconds','30 seconds','45 seconds']);
+function send(){const v=$('cinput').value.trim();if(!v)return;me(v);$('cinput').value='';handle(v);}
+function handle(t){
+  const l=t.toLowerCase();const m=l.match(/(\d+)\s*sec/);if(m)cfg.seconds=Math.max(10,Math.min(60,+m[1]));
+  if(/lux|slow|elegant/.test(l))cfg.style='luxurious';
+  else if(/bright|energ|fast|upbeat/.test(l))cfg.style='bright';
+  else if(/cinema|moody|dram/.test(l))cfg.style='cinematic';
+  bot(`Got it — a ${cfg.style} tour, about ${cfg.seconds} seconds${photos.length?` across ${photos.length} rooms`:''}. ${photos.length?'Hit "Create tour" when ready. 🎬':'Add a few photos and we\'re set.'}`);
+  chips(['Slower','Faster','More cinematic','20s','30s','45s']);
+}
+// ---- upload ----
+$('drop').onclick=()=>$('file').click();
+$('drop').ondragover=e=>{e.preventDefault();$('drop').classList.add('over');};
+$('drop').ondragleave=()=>$('drop').classList.remove('over');
+$('drop').ondrop=e=>{e.preventDefault();$('drop').classList.remove('over');add(e.dataTransfer.files);};
+$('file').onchange=e=>add(e.target.files);
+function add(list){[...list].filter(f=>f.type.startsWith('image/')).forEach(f=>{if(photos.length>=20)return;const img=new Image();img.onload=()=>{photos.push({img,cap:room(photos.length)});draw();};img.src=URL.createObjectURL(f);});}
+function room(i){return['Entryway','Living room','Kitchen','Master bedroom','Bathroom','Dining area','Family room','Backyard','Bedroom','Office','Patio','Hallway','Garage','Pool','Balcony','Closet','Laundry','Gym','Study','Den'][i]||'Room '+(i+1);}
+function draw(){const t=$('thumbs');t.innerHTML='';photos.forEach((p,i)=>{const d=document.createElement('div');d.className='thumb';d.innerHTML=`<img src="${p.img.src}"><button class="x">×</button>`;d.querySelector('.x').onclick=()=>{photos.splice(i,1);draw();};t.appendChild(d);});$('count').textContent=photos.length+' / 20 photos';$('go').disabled=!photos.length;}
+// ---- render tour (browser cinematic) ----
+function cover(im){const r=Math.max(W/im.width,H/im.height);return{w:im.width*r,h:im.height*r};}
+function ken(p,prog){const spd=cfg.style==='bright'?1:cfg.style==='luxurious'?0.6:0.8;const z=1.05+0.16*prog*spd;const c=cover(p.img);const w=c.w*z,h=c.h*z;x.drawImage(p.img,(W-w)/2-(prog-.5)*46,(H-h)/2-(prog-.5)*26,w,h);const g=x.createRadialGradient(W/2,H/2,H*.4,W/2,H/2,H*.95);g.addColorStop(0,'rgba(0,0,0,0)');g.addColorStop(1,cfg.style==='cinematic'?'rgba(0,0,0,.55)':'rgba(0,0,0,.35)');x.fillStyle=g;x.fillRect(0,0,W,H);}
+function cap(t){if(!t)return;x.font='600 40px Inter';const w=x.measureText(t).width;x.fillStyle='rgba(0,0,0,.42)';x.fillRect(56,H-118,w+44,66);x.fillStyle='#fff';x.fillText(t,78,H-72);}
+function card(lines){x.fillStyle='#141414';x.fillRect(0,0,W,H);x.textAlign='center';x.fillStyle='#c9a24e';x.font='600 24px Inter';x.fillText(lines[0],W/2,H/2-58);x.fillStyle='#fff';x.font='600 60px Fraunces';x.fillText(lines[1],W/2,H/2+8);if(lines[2]){x.fillStyle='#e9e6df';x.font='500 32px Inter';x.fillText(lines[2],W/2,H/2+62);}x.textAlign='left';}
+let busy=false;
+async function generate(){
+  if(busy||!photos.length)return;busy=true;$('go').disabled=true;$('dl').style.display='none';
+  const loc=$('loc').value.split('·');
+  const per=Math.max(1800,((cfg.seconds*1000)-4600)/photos.length),trans=600;
+  const stream=cv.captureStream(30);const rec=new MediaRecorder(stream,{mimeType:'video/webm'});const chunks=[];rec.ondataavailable=e=>chunks.push(e.data);rec.start();
+  const run=(ms,fn)=>new Promise(r=>{const s=performance.now();(function l(n){const t=n-s;if(t>=ms){r();return;}fn(t/ms);$('st').textContent='rendering '+Math.round((t)/1000)+'s';requestAnimationFrame(l);})(performance.now());});
+  await run(2200,()=>card([(loc[0]||'').toUpperCase(),$('title').value,loc[1]||'']));
+  for(let i=0;i<photos.length;i++){await run(per,pr=>{ken(photos[i],pr);cap(photos[i].cap);});}
+  await run(2400,()=>card(['THANK YOU','Schedule a private showing',$('agent').value]));
+  rec.stop();await new Promise(r=>rec.onstop=r);
+  const b=new Blob(chunks,{type:'video/webm'});const a=$('dl');a.href=URL.createObjectURL(b);a.download='property-tour.webm';a.style.display='block';$('st').textContent='done ✓ '+Math.round(b.size/1e6*10)/10+'MB';
+  busy=false;$('go').disabled=false;
+}
+x.fillStyle='#111';x.fillRect(0,0,W,H);x.fillStyle='#777';x.textAlign='center';x.font='500 20px Inter';x.fillText('Tour preview',W/2,H/2);x.textAlign='left';
+</script></body></html>
