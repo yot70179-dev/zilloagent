@@ -77,7 +77,13 @@ label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
         <div id="chips"></div>
         <div class="cin"><input id="cinput" placeholder="e.g. slow luxury tour, 30 seconds" onkeydown="if(event.key==='Enter')send()"><button class="btn" onclick="send()">Send</button></div>
       </div>
-      <button class="btn block" id="go" onclick="generate()" disabled>🎬 Create tour</button>
+      <button class="btn block" id="go" onclick="generate()" disabled>🎬 Create tour (free preview)</button>
+      <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;">
+        <div class="h" style="margin-bottom:6px;">Pro · real AI walkthrough</div>
+        <input id="listing" placeholder="Paste a listing link (Realtor / Zillow)" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;">
+        <button class="btn block" id="pro" onclick="proTour()">✨ Create real AI tour — $49</button>
+        <div class="st" id="prost" style="margin-top:8px;"></div>
+      </div>
     </div>
   </div>
   <!-- RIGHT: preview -->
@@ -93,6 +99,35 @@ label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
 const cv=document.getElementById('cv'),x=cv.getContext('2d'),W=1280,H=720;
 let photos=[]; const cfg={style:'cinematic',seconds:30};
 const $=id=>document.getElementById(id);
+// ---- Pro config: set these two when you deploy ----
+const API_BASE='';                       // e.g. 'https://reeltour-api.onrender.com'
+const LEMON_LINK='';                      // your Lemon Squeezy buy link
+const PAID_FLAG='reeltour_paid';
+// ---- Pro flow: pay (once) then generate a real continuous tour from a listing link ----
+async function proTour(){
+  const url=$('listing').value.trim();
+  if(!url){$('prost').textContent='Paste a listing link first.';return;}
+  if(LEMON_LINK && localStorage.getItem(PAID_FLAG)!=='1'){
+    // send them to checkout; on return, ?paid=1 marks them paid
+    window.location.href=LEMON_LINK+(LEMON_LINK.includes('?')?'&':'?')+'checkout[custom][return]='+encodeURIComponent(location.href+'?paid=1');
+    return;
+  }
+  if(!API_BASE){$('prost').textContent='Backend not connected yet — deploy the API and set API_BASE. (See RUNBOOK.)';return;}
+  $('pro').disabled=true;$('prost').textContent='Starting your tour…';
+  try{
+    const r=await fetch(API_BASE+'/api/tour',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listing_url:url})});
+    const {job_id}=await r.json();
+    const poll=async()=>{
+      const s=await(await fetch(API_BASE+'/api/tour/'+job_id)).json();
+      $('prost').textContent='Status: '+s.status+(s.clip_urls?` (${s.clip_urls.filter(Boolean).length}/${s.clip_urls.length} clips)`:'');
+      if(s.status==='done'||s.status==='partial'){showClips(s.clip_urls);$('pro').disabled=false;return;}
+      if(s.status==='error'){$('prost').textContent='Error: '+(s.error||'unknown');$('pro').disabled=false;return;}
+      setTimeout(poll,5000);
+    };poll();
+  }catch(e){$('prost').textContent='Request failed: '+e.message;$('pro').disabled=false;}
+}
+function showClips(urls){const c=$('prost');urls.filter(Boolean).forEach((u,i)=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.textContent=' clip '+(i+1)+' ';a.style.color='#1f6feb';c.appendChild(a);});}
+if(new URLSearchParams(location.search).get('paid')==='1')localStorage.setItem(PAID_FLAG,'1');
 // ---- chat ----
 function bot(t){const d=document.createElement('div');d.className='bub bot';d.textContent=t;$('msgs').appendChild(d);$('msgs').scrollTop=1e9;}
 function me(t){const d=document.createElement('div');d.className='bub me';d.textContent=t;$('msgs').appendChild(d);$('msgs').scrollTop=1e9;}

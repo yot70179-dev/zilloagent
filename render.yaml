@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: reeltour-api
+    runtime: python
+    plan: starter
+    rootDir: reeltour
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: HF_KEY_ID
+        sync: false
+      - key: HF_KEY_SECRET
+        sync: false
+      - key: RAPIDAPI_KEY
+        sync: false
+      - key: RAPIDAPI_HOST
+        value: us-real-estate-listings.p.rapidapi.com
+      - key: HF_MODEL
+        value: dop-turbo
+      - key: CORS_ORIGINS
+        value: "*"
