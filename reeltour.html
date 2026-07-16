@@ -56,17 +56,24 @@ label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
   <div style="font-size:13px;color:var(--muted);">Property tour studio</div>
 </div>
 <div class="wrap">
-  <!-- LEFT: photos + details -->
+  <!-- LEFT: paste a link → photos + price pulled automatically -->
   <div class="col">
-    <div class="h">1 · Photos <span style="float:right;font-weight:400;text-transform:none;">up to 20</span></div>
-    <div id="drop" class="drop"><div style="font-size:22px;margin-bottom:4px;">⬆︎</div>Drop room photos<br><span style="font-size:11px;">or click to browse</span></div>
-    <input id="file" type="file" accept="image/*" multiple hidden>
-    <div id="thumbs" class="thumbs"></div>
-    <div class="count" id="count">0 / 20 photos</div>
-    <div class="h" style="margin-top:22px;">Listing details</div>
-    <div class="field"><label>Title</label><input id="title" value="Modern Family Home"></div>
-    <div class="field"><label>Location · price</label><input id="loc" value="Los Angeles · $2,000,000"></div>
-    <div class="field"><label>Agent</label><input id="agent" value="Your Name · Your Realty"></div>
+    <div class="h">1 · Paste the listing link</div>
+    <input id="listing" placeholder="https://www.realtor.com/realestateandhomes-detail/…" style="width:100%;padding:11px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;">
+    <button class="btn block" id="pro" onclick="proTour()">✨ Create tour — $49</button>
+    <div style="font-size:12px;color:var(--muted);margin-top:8px;">Photos & price are pulled from the listing automatically. Realtor.com works best (Zillow blocks automated access).</div>
+    <div class="st" id="prost" style="margin-top:8px;"></div>
+
+    <details style="margin-top:22px;">
+      <summary class="h" style="cursor:pointer;">Or upload photos manually <span style="font-weight:400;text-transform:none;">optional</span></summary>
+      <div id="drop" class="drop" style="margin-top:10px;"><div style="font-size:22px;margin-bottom:4px;">⬆︎</div>Drop room photos<br><span style="font-size:11px;">or click to browse</span></div>
+      <input id="file" type="file" accept="image/*" multiple hidden>
+      <div id="thumbs" class="thumbs"></div>
+      <div class="count" id="count">0 / 20 photos</div>
+      <div class="field"><label>Title</label><input id="title" value="Modern Family Home"></div>
+      <div class="field"><label>Location · price</label><input id="loc" value="Los Angeles · $2,000,000"></div>
+      <div class="field"><label>Agent</label><input id="agent" value="Your Name · Your Realty"></div>
+    </details>
   </div>
   <!-- MID: chat -->
   <div class="col mid">
@@ -77,13 +84,7 @@ label{font-size:12px;color:var(--muted);display:block;margin-bottom:4px;}
         <div id="chips"></div>
         <div class="cin"><input id="cinput" placeholder="e.g. slow luxury tour, 30 seconds" onkeydown="if(event.key==='Enter')send()"><button class="btn" onclick="send()">Send</button></div>
       </div>
-      <button class="btn block" id="go" onclick="generate()" disabled>🎬 Create tour (free preview)</button>
-      <div style="margin-top:12px;border-top:1px solid var(--line);padding-top:12px;">
-        <div class="h" style="margin-bottom:6px;">Pro · real AI walkthrough</div>
-        <input id="listing" placeholder="Paste a listing link (Realtor / Zillow)" style="width:100%;padding:10px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;">
-        <button class="btn block" id="pro" onclick="proTour()">✨ Create real AI tour — $49</button>
-        <div class="st" id="prost" style="margin-top:8px;"></div>
-      </div>
+      <button class="btn block" id="go" onclick="generate()" disabled>🎬 Free browser preview (manual photos)</button>
     </div>
   </div>
   <!-- RIGHT: preview -->
