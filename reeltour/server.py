@@ -18,6 +18,7 @@ import re
 import time
 import uuid
 import shutil
+import subprocess
 import threading
 from typing import Optional
 
@@ -167,6 +168,54 @@ def get_listing_photos(listing_url: str) -> list[str]:
     return uniq[:MAX_PHOTOS]
 
 
+def get_listing_meta(listing_url: str) -> dict:
+    """Pull address + price from the listing so the title card fills itself in."""
+    meta = {"title": "Property Tour", "loc": ""}
+    if not RAPIDAPI_KEY:
+        return meta
+    m = re.search(r"[_/](M?\d{6,})", listing_url)
+    if not m:
+        return meta
+    prop_id = m.group(1).lstrip("M")
+    try:
+        r = requests.get(f"https://{RAPIDAPI_HOST}/propertyDetails",
+                         headers={"x-rapidapi-key": RAPIDAPI_KEY,
+                                  "x-rapidapi-host": RAPIDAPI_HOST},
+                         params={"id": prop_id}, timeout=25)
+        d = r.json() if r.ok else {}
+        # dig for address line / city / price anywhere in the blob
+        line = _first(d, ("line",)) or ""
+        city = _first(d, ("city",)) or ""
+        price = _first(d, ("list_price", "price"))
+        if line:
+            meta["title"] = line
+        loc_parts = [p for p in (city,) if p]
+        if price:
+            loc_parts.append("$" + f"{int(price):,}")
+        meta["loc"] = " · ".join(loc_parts)
+    except Exception:
+        pass
+    return meta
+
+
+def _first(node, keys):
+    """Depth-first search for the first value under any of `keys`."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            if k in keys and isinstance(v, (str, int, float)) and v not in ("", None):
+                return v
+        for v in node.values():
+            r = _first(v, keys)
+            if r not in (None, "", 0):
+                return r
+    elif isinstance(node, list):
+        for it in node:
+            r = _first(it, keys)
+            if r not in (None, "", 0):
+                return r
+    return None
+
+
 # ----------------------------------------------------------------------------
 # 2. Higgsfield REST — import + generate continuous transitions
 # ----------------------------------------------------------------------------
@@ -211,7 +260,7 @@ def hf_poll(job_id: str) -> dict:
 # 3. Orchestration (runs in a background thread per tour)
 # ----------------------------------------------------------------------------
 def build_tour_from_link(job_id: str, listing_url: str):
-    """Resolve a listing link to photos, then run the shared build pipeline."""
+    """Resolve a listing link to photos + price/address, then run the pipeline."""
     job = JOBS[job_id]
     job["status"] = "fetching_photos"
     photos = get_listing_photos(listing_url)
@@ -220,11 +269,12 @@ def build_tour_from_link(job_id: str, listing_url: str):
                    error="Could not find enough photos on that listing. "
                          "Zillow links are blocked — use a Realtor.com link or upload photos.")
         return
-    build_tour(job_id, photos)
+    job["meta"] = get_listing_meta(listing_url)   # {title, loc} auto-pulled
+    build_tour(job_id, photos, job["meta"])
 
 
-def build_tour(job_id: str, photos: list[str]):
-    """Core pipeline: photos (already public URLs) -> continuous clips."""
+def build_tour(job_id: str, photos: list[str], meta: Optional[dict] = None):
+    """Core pipeline: photos -> continuous clips -> ONE stitched tour video."""
     job = JOBS[job_id]
     try:
         photos = [upscale_photo_url(u) for u in photos][:MAX_PHOTOS]
@@ -255,14 +305,92 @@ def build_tour(job_id: str, photos: list[str]):
                     clip_urls[idx] = url
             job["clip_urls"] = clip_urls
 
-        if all(clip_urls):
-            job.update(status="done", clip_urls=clip_urls)
-        else:
-            job.update(status="partial", clip_urls=clip_urls)
+        job["clip_urls"] = clip_urls
+        ready = [u for u in clip_urls if u]
+        if not ready:
+            job.update(status="error", error="No clips were generated.")
+            return
+
+        # stitch every finished clip into ONE tour video with a title card
+        job["status"] = "stitching"
+        try:
+            final = stitch_clips(job_id, ready, meta or job.get("meta") or {})
+            job.update(status="done", final_url=final,
+                       clip_urls=clip_urls)
+        except Exception as e:
+            # clips are fine even if stitching fails — return them so nothing is lost
+            job.update(status="done_unstitched", clip_urls=clip_urls,
+                       stitch_error=str(e))
     except HTTPException as e:
         job.update(status="error", error=e.detail)
     except Exception as e:  # pragma: no cover
         job.update(status="error", error=str(e))
+
+
+def _ffmpeg() -> str:
+    import imageio_ffmpeg
+    return imageio_ffmpeg.get_ffmpeg_exe()
+
+
+def _esc(t: str) -> str:
+    """Escape text for ffmpeg drawtext."""
+    return (t or "").replace("\\", "").replace(":", r"\:").replace("'", "")
+
+
+def stitch_clips(job_id: str, clip_urls: list[str], meta: dict) -> str:
+    """Download clips, prepend a title card, concat into one 1080p tour MP4.
+
+    Returns the public URL of the final video (served from /uploads).
+    Requires PUBLIC_BASE so the dashboard can play it; ffmpeg via imageio-ffmpeg.
+    """
+    if not PUBLIC_BASE:
+        raise RuntimeError("PUBLIC_BASE_URL not set — cannot publish the final video.")
+    ff = _ffmpeg()
+    work = os.path.join(UPLOAD_DIR, job_id)
+    os.makedirs(work, exist_ok=True)
+
+    # 1. download each clip, normalise to 1920x1080 / 30fps / same codec so concat is clean
+    norm_files = []
+    for i, url in enumerate(clip_urls):
+        raw = os.path.join(work, f"raw{i}.mp4")
+        with requests.get(url, stream=True, timeout=120) as r:
+            r.raise_for_status()
+            with open(raw, "wb") as f:
+                for chunk in r.iter_content(1 << 16):
+                    f.write(chunk)
+        norm = os.path.join(work, f"n{i}.mp4")
+        subprocess.run([ff, "-y", "-i", raw,
+                        "-vf", "scale=1920:1080:force_original_aspect_ratio=increase,"
+                               "crop=1920:1080,fps=30",
+                        "-c:v", "libx264", "-pix_fmt", "yuv420p", "-an", norm],
+                       check=True, capture_output=True)
+        norm_files.append(norm)
+
+    # 2. title card (address + price) as a 2s clip matching the format
+    title = _esc(meta.get("title", "Property Tour"))
+    loc   = _esc(meta.get("loc", ""))
+    card = os.path.join(work, "card.mp4")
+    draw = (f"drawtext=text='{title}':fontcolor=white:fontsize=64:x=(w-tw)/2:y=(h/2)-40:"
+            f"box=1:boxcolor=black@0.0")
+    if loc:
+        draw += (f",drawtext=text='{loc}':fontcolor=0xD8A24E:fontsize=40:"
+                 f"x=(w-tw)/2:y=(h/2)+40")
+    subprocess.run([ff, "-y", "-f", "lavfi",
+                    "-i", "color=c=0x141414:s=1920x1080:d=2:r=30",
+                    "-vf", draw, "-c:v", "libx264", "-pix_fmt", "yuv420p", card],
+                   check=True, capture_output=True)
+
+    # 3. concat card + all clips
+    listing = os.path.join(work, "list.txt")
+    with open(listing, "w") as f:
+        f.write(f"file '{os.path.abspath(card)}'\n")
+        for n in norm_files:
+            f.write(f"file '{os.path.abspath(n)}'\n")
+    out = os.path.join(work, "tour.mp4")
+    subprocess.run([ff, "-y", "-f", "concat", "-safe", "0", "-i", listing,
+                    "-c", "copy", out], check=True, capture_output=True)
+
+    return f"{PUBLIC_BASE}/uploads/{job_id}/tour.mp4"
 
 
 def _extract_id(resp: dict) -> Optional[str]:

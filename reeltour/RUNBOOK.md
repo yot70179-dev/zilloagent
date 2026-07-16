@@ -55,8 +55,12 @@ Three pieces: **frontend** (already live), **payments** (Lemon Squeezy link), **
 - `GET  /health` — config check (shows whether uploads are reachable).
 - `POST /api/tour` `{ "listing_url": "..." }` → `{ "job_id": "..." }`  (Realtor.com link)
 - `POST /api/tour/upload` multipart `files=@a.jpg&files=@b.jpg ...` → `{ "job_id": "..." }`
-- `GET  /api/tour/{job_id}` → `{ status, photos, clip_urls[] }`
-  statuses: `queued → fetching_photos → generating → done | partial | error`
+- `GET  /api/tour/{job_id}` → `{ status, photos, meta{title,loc}, clip_urls[], final_url }`
+  statuses: `queued → fetching_photos → generating → stitching → done`
+  (`done_unstitched` = clips ok but ffmpeg concat failed; `partial`/`error` as before)
+  `final_url` is the ONE stitched tour video (title card with auto-pulled address+price
+  + all room transitions). ffmpeg is bundled via `imageio-ffmpeg` (no system install).
+  Needs `PUBLIC_BASE_URL`/`RENDER_EXTERNAL_URL` so the final video is reachable.
 
 ## One thing to verify with the first funded run
 The polling endpoint (`GET /image2video/dop/{id}`) and the success-response shape are

@@ -117,15 +117,18 @@ async function proTour(){
   try{
     const r=await fetch(API_BASE+'/api/tour',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({listing_url:url})});
     const {job_id}=await r.json();
+    const label={queued:'Queued…',fetching_photos:'Pulling photos & price…',generating:'Filming your tour…',stitching:'Editing into one video…'};
     const poll=async()=>{
       const s=await(await fetch(API_BASE+'/api/tour/'+job_id)).json();
-      $('prost').textContent='Status: '+s.status+(s.clip_urls?` (${s.clip_urls.filter(Boolean).length}/${s.clip_urls.length} clips)`:'');
-      if(s.status==='done'||s.status==='partial'){showClips(s.clip_urls);$('pro').disabled=false;return;}
+      $('prost').textContent=(label[s.status]||s.status)+(s.clip_urls?` (${s.clip_urls.filter(Boolean).length}/${s.clip_urls.length} rooms)`:'');
+      if(s.status==='done'&&s.final_url){showFinal(s.final_url);$('pro').disabled=false;return;}
+      if(s.status==='done'||s.status==='done_unstitched'||s.status==='partial'){showClips(s.clip_urls||[]);$('pro').disabled=false;return;}
       if(s.status==='error'){$('prost').textContent='Error: '+(s.error||'unknown');$('pro').disabled=false;return;}
       setTimeout(poll,5000);
     };poll();
   }catch(e){$('prost').textContent='Request failed: '+e.message;$('pro').disabled=false;}
 }
+function showFinal(url){const c=$('prost');c.textContent='Your tour is ready ✓ ';const v=document.createElement('video');v.src=url;v.controls=true;v.style.cssText='width:100%;border-radius:10px;margin-top:8px;';const a=document.createElement('a');a.href=url;a.download='property-tour.mp4';a.textContent='⬇ Download tour';a.style.cssText='display:inline-block;margin-top:8px;color:#1f6feb;';c.appendChild(v);c.appendChild(a);}
 function showClips(urls){const c=$('prost');urls.filter(Boolean).forEach((u,i)=>{const a=document.createElement('a');a.href=u;a.target='_blank';a.textContent=' clip '+(i+1)+' ';a.style.color='#1f6feb';c.appendChild(a);});}
 if(new URLSearchParams(location.search).get('paid')==='1')localStorage.setItem(PAID_FLAG,'1');
 // ---- chat ----
