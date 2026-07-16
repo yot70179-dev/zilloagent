@@ -43,9 +43,18 @@ Three pieces: **frontend** (already live), **payments** (Lemon Squeezy link), **
 
 ---
 
+## Photo sources (important)
+- **Realtor.com link** → works (RapidAPI feed, verified live: 120x80 thumbnails → 1280x853).
+- **Zillow link** → BLOCKED. Zillow denies automated access from both server and
+  browser (bot protection). Do not rely on it.
+- **Direct upload** → the universal fallback (covers Zillow and everything else). The
+  customer saves the photos and uploads them; needs `PUBLIC_BASE_URL` set so Higgsfield
+  can fetch them (Render provides `RENDER_EXTERNAL_URL` automatically).
+
 ## API
-- `GET  /health` — config check.
-- `POST /api/tour` `{ "listing_url": "..." }` → `{ "job_id": "..." }`
+- `GET  /health` — config check (shows whether uploads are reachable).
+- `POST /api/tour` `{ "listing_url": "..." }` → `{ "job_id": "..." }`  (Realtor.com link)
+- `POST /api/tour/upload` multipart `files=@a.jpg&files=@b.jpg ...` → `{ "job_id": "..." }`
 - `GET  /api/tour/{job_id}` → `{ status, photos, clip_urls[] }`
   statuses: `queued → fetching_photos → generating → done | partial | error`
 

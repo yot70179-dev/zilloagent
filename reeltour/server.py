@@ -17,12 +17,14 @@ import os
 import re
 import time
 import uuid
+import shutil
 import threading
 from typing import Optional
 
 import requests
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 # ----------------------------------------------------------------------------
@@ -43,6 +45,13 @@ TOUR_PROMPT = (
     "real estate walkthrough, no people, natural daylight"
 )
 
+# Public base URL of THIS server — needed so Higgsfield can fetch uploaded photos.
+# Render sets RENDER_EXTERNAL_URL automatically; override with PUBLIC_BASE_URL if needed.
+PUBLIC_BASE = (os.environ.get("PUBLIC_BASE_URL")
+               or os.environ.get("RENDER_EXTERNAL_URL") or "").rstrip("/")
+UPLOAD_DIR  = os.environ.get("UPLOAD_DIR", "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
 app = FastAPI(title="ReelTour API")
 app.add_middleware(
     CORSMiddleware,
@@ -50,6 +59,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Serve uploaded photos publicly so Higgsfield's media_import can fetch them
+app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
 
 # In-memory job store (fine for MVP; swap for Redis/DB when scaling)
 JOBS: dict[str, dict] = {}
@@ -199,13 +210,26 @@ def hf_poll(job_id: str) -> dict:
 # ----------------------------------------------------------------------------
 # 3. Orchestration (runs in a background thread per tour)
 # ----------------------------------------------------------------------------
-def build_tour(job_id: str, listing_url: str):
+def build_tour_from_link(job_id: str, listing_url: str):
+    """Resolve a listing link to photos, then run the shared build pipeline."""
+    job = JOBS[job_id]
+    job["status"] = "fetching_photos"
+    photos = get_listing_photos(listing_url)
+    if len(photos) < 2:
+        job.update(status="error",
+                   error="Could not find enough photos on that listing. "
+                         "Zillow links are blocked — use a Realtor.com link or upload photos.")
+        return
+    build_tour(job_id, photos)
+
+
+def build_tour(job_id: str, photos: list[str]):
+    """Core pipeline: photos (already public URLs) -> continuous clips."""
     job = JOBS[job_id]
     try:
-        job["status"] = "fetching_photos"
-        photos = get_listing_photos(listing_url)
+        photos = [upscale_photo_url(u) for u in photos][:MAX_PHOTOS]
         if len(photos) < 2:
-            job.update(status="error", error="Could not find enough photos on that listing.")
+            job.update(status="error", error="Need at least 2 photos.")
             return
         job["photos"] = photos
 
@@ -275,14 +299,45 @@ class TourRequest(BaseModel):
 def health():
     return {"ok": True, "model": HF_MODEL,
             "hf_configured": bool(HF_KEY_ID and HF_KEY_SECRET),
-            "rapidapi_configured": bool(RAPIDAPI_KEY)}
+            "rapidapi_configured": bool(RAPIDAPI_KEY),
+            "public_base": PUBLIC_BASE or "(unset — uploads need PUBLIC_BASE_URL)"}
 
 
 @app.post("/api/tour")
 def create_tour(req: TourRequest):
+    """Create a tour from a listing link (Realtor.com works; Zillow is blocked)."""
     job_id = uuid.uuid4().hex
-    JOBS[job_id] = {"status": "queued", "listing_url": req.listing_url}
-    threading.Thread(target=build_tour, args=(job_id, req.listing_url), daemon=True).start()
+    JOBS[job_id] = {"status": "queued", "source": "link", "listing_url": req.listing_url}
+    threading.Thread(target=build_tour_from_link, args=(job_id, req.listing_url),
+                     daemon=True).start()
+    return {"job_id": job_id}
+
+
+@app.post("/api/tour/upload")
+async def create_tour_upload(files: list[UploadFile] = File(...)):
+    """Create a tour from directly uploaded photos (covers Zillow & any other source).
+
+    Files are saved and served from /uploads so Higgsfield can fetch them by URL.
+    Requires PUBLIC_BASE_URL (or RENDER_EXTERNAL_URL) so the URLs are reachable.
+    """
+    if not PUBLIC_BASE:
+        raise HTTPException(500, "PUBLIC_BASE_URL not set — cannot expose uploads to Higgsfield.")
+    if len(files) < 2:
+        raise HTTPException(400, "Upload at least 2 photos.")
+
+    job_id = uuid.uuid4().hex
+    folder = os.path.join(UPLOAD_DIR, job_id)
+    os.makedirs(folder, exist_ok=True)
+    urls: list[str] = []
+    for idx, f in enumerate(files[:MAX_PHOTOS]):
+        ext = os.path.splitext(f.filename or "")[1].lower() or ".jpg"
+        name = f"{idx:02d}{ext}"
+        with open(os.path.join(folder, name), "wb") as out:
+            shutil.copyfileobj(f.file, out)
+        urls.append(f"{PUBLIC_BASE}/uploads/{job_id}/{name}")
+
+    JOBS[job_id] = {"status": "queued", "source": "upload", "photos": urls}
+    threading.Thread(target=build_tour, args=(job_id, urls), daemon=True).start()
     return {"job_id": job_id}
 
 
