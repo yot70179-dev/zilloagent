@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TrendCart — חנות הגאדג'טים החכמה</title>
+  <meta name="description" content="חנות דרופשיפינג עם המוצרים הכי חמים: גאדג'טים, בית חכם, אלקטרוניקה ועוד. משלוח חינם עד הבית." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="topbar">🚚 משלוח חינם בהזמנה מעל ₪199 · 🔒 תשלום מאובטח · ↩️ 30 יום להחזרה</div>
+
+  <header class="nav">
+    <div class="container nav-inner">
+      <a class="logo" href="#">
+        <span class="dot">🛍️</span>
+        <span>TrendCart</span>
+      </a>
+      <nav class="nav-links">
+        <a href="#products">מוצרים</a>
+        <a href="#" data-cat="בית חכם">בית חכם</a>
+        <a href="#" data-cat="אלקטרוניקה">אלקטרוניקה</a>
+        <a href="#why">למה אנחנו</a>
+      </nav>
+      <button class="cart-btn" id="openCart">
+        🛒 <span>העגלה</span>
+        <span class="cart-count" id="cartCount">0</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Hero -->
+    <section class="container hero">
+      <div>
+        <h1>הטרנדים הכי <span class="grad">חמים</span><br />ישר עד הבית שלך</h1>
+        <p>אלפי לקוחות מרוצים כבר קנו אצלנו. גאדג'טים, מוצרי בית חכם ואביזרים במחירים שלא תמצאו בשוק — עם משלוח מהיר ואחריות מלאה.</p>
+        <div class="hero-cta">
+          <button class="btn btn-primary" onclick="document.getElementById('products').scrollIntoView({behavior:'smooth'})">לקנייה עכשיו ⬇️</button>
+          <a class="btn btn-ghost" href="#why">איך זה עובד?</a>
+        </div>
+        <div class="hero-stats">
+          <div><b>25K+</b><span>לקוחות מרוצים</span></div>
+          <div><b>4.8★</b><span>דירוג ממוצע</span></div>
+          <div><b>48ש'</b><span>זמן אספקה ממוצע</span></div>
+        </div>
+      </div>
+      <div class="hero-visual">
+        🛍️
+        <span class="float f1">🎧</span>
+        <span class="float f2">💡</span>
+        <span class="float f3">📽️</span>
+      </div>
+    </section>
+
+    <!-- Trust -->
+    <div class="container">
+      <div class="trust">
+        <div><span class="ic">🚚</span> משלוח חינם מעל ₪199</div>
+        <div><span class="ic">🔒</span> תשלום מאובטח SSL</div>
+        <div><span class="ic">↩️</span> 30 יום להחזרה</div>
+        <div><span class="ic">💬</span> תמיכה בוואטסאפ</div>
+      </div>
+    </div>
+
+    <!-- Products -->
+    <section class="container section" id="products">
+      <div class="section-head">
+        <div>
+          <h2>המוצרים הנמכרים ביותר</h2>
+          <p>בחרנו בשבילכם את הפריטים שכולם מדברים עליהם</p>
+        </div>
+        <div class="filters" id="filters"></div>
+      </div>
+      <div class="grid" id="grid"></div>
+    </section>
+
+    <!-- Why us -->
+    <section class="container section" id="why">
+      <div class="section-head">
+        <div>
+          <h2>למה לקנות ב-TrendCart?</h2>
+          <p>שירות שאתם יכולים לסמוך עליו</p>
+        </div>
+      </div>
+      <div class="trust" style="grid-template-columns:repeat(3,1fr);border:none;padding:0;">
+        <div style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <span class="ic" style="font-size:2rem;">⚡</span>
+          <b style="color:var(--text);font-size:1.1rem;">אספקה מהירה</b>
+          <span>שיתופי פעולה עם מחסנים מקומיים לזמני משלוח קצרים.</span>
+        </div>
+        <div style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <span class="ic" style="font-size:2rem;">🏷️</span>
+          <b style="color:var(--text);font-size:1.1rem;">מחירים משתלמים</b>
+          <span>קונים ישירות מהיצרן — בלי מתווכים ובלי תוספות מיותרות.</span>
+        </div>
+        <div style="flex-direction:column;align-items:flex-start;gap:6px;">
+          <span class="ic" style="font-size:2rem;">🛡️</span>
+          <b style="color:var(--text);font-size:1.1rem;">קנייה בטוחה</b>
+          <span>אחריות מלאה, החזר כספי ותמיכה אנושית בכל שאלה.</span>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container">
+      <div class="foot-grid">
+        <div>
+          <div class="logo" style="margin-bottom:10px;"><span class="dot">🛍️</span> TrendCart</div>
+          <p style="font-size:0.9rem;">חנות הדרופשיפינג שמביאה לכם את הטרנדים העולמיים ישר עד הבית, במחירים הכי טובים.</p>
+        </div>
+        <div>
+          <h4>קניות</h4>
+          <a href="#products">כל המוצרים</a>
+          <a href="#">רבי מכר</a>
+          <a href="#">מבצעים</a>
+        </div>
+        <div>
+          <h4>שירות</h4>
+          <a href="#">מדיניות משלוחים</a>
+          <a href="#">החזרות והחלפות</a>
+          <a href="#">שאלות נפוצות</a>
+        </div>
+        <div>
+          <h4>יצירת קשר</h4>
+          <a href="#">💬 וואטסאפ</a>
+          <a href="mailto:hello@trendcart.example">✉️ מייל</a>
+          <a href="#">📷 אינסטגרם</a>
+        </div>
+      </div>
+      <div class="copyright">© 2026 TrendCart · אתר הדגמה לחנות דרופשיפינג · כל הזכויות שמורות</div>
+    </div>
+  </footer>
+
+  <!-- Cart drawer -->
+  <div class="overlay" id="overlay"></div>
+  <aside class="drawer" id="drawer" aria-label="עגלת קניות">
+    <div class="drawer-head">
+      <h3>העגלה שלך 🛒</h3>
+      <button class="close-x" id="closeCart">×</button>
+    </div>
+    <div class="drawer-body" id="cartBody"></div>
+    <div class="drawer-foot" id="cartFoot" style="display:none;">
+      <div class="total-row"><span>סה"כ לתשלום</span><span id="cartTotal">₪0</span></div>
+      <div class="ship-note" id="shipNote"></div>
+      <button class="btn btn-primary checkout-btn" id="checkoutBtn">מעבר לתשלום 💳</button>
+    </div>
+  </aside>
+
+  <!-- Checkout modal -->
+  <div class="modal-overlay" id="checkoutModal">
+    <div class="modal" id="checkoutInner">
+      <h3>פרטי הזמנה</h3>
+      <p class="sub">מלאו את הפרטים ונחזור אליכם לאישור ההזמנה.</p>
+      <form id="checkoutForm">
+        <div class="field">
+          <label>שם מלא</label>
+          <input type="text" name="name" required placeholder="ישראל ישראלי" />
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label>טלפון</label>
+            <input type="tel" name="phone" required placeholder="050-0000000" />
+          </div>
+          <div class="field">
+            <label>אימייל</label>
+            <input type="email" name="email" required placeholder="you@mail.com" />
+          </div>
+        </div>
+        <div class="field">
+          <label>כתובת למשלוח</label>
+          <input type="text" name="address" required placeholder="רחוב, מספר, עיר" />
+        </div>
+        <div class="field">
+          <label>הערות (אופציונלי)</label>
+          <textarea name="notes" rows="2" placeholder="קומה, קוד כניסה, שעות נוחות..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width:100%;">אישור הזמנה · <span id="modalTotal">₪0</span></button>
+        <button type="button" class="btn btn-ghost" id="cancelCheckout" style="width:100%;margin-top:8px;">חזרה לעגלה</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">נוסף לעגלה ✓</div>
+
+  <script src="products.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
