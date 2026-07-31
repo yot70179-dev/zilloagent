@@ -3,7 +3,7 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>ReelTour — Turn Listing Photos Into Cinematic Property Tour Videos</title>
-<meta name="description" content="ReelTour turns your real estate listing photos into a cinematic property tour video in 24 hours. AI camera motion, no filming, no editing. Built for real estate agents. From $10 a video.">
+<meta name="description" content="ReelTour turns your real estate listing photos into a cinematic property tour video in 24 hours. AI camera motion, no filming, no editing. Built for real estate agents. $19/month unlimited.">
 <meta name="keywords" content="real estate video maker, listing video, property tour video, real estate listing video from photos, AI real estate video, property video maker, real estate marketing video, virtual tour video, listing video creator">
 <link rel="canonical" href="https://yot70179-dev.github.io/zilloagent/reeltour-home.html">
 <meta property="og:type" content="website">
@@ -14,7 +14,7 @@
 <meta name="robots" content="index,follow">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap" rel="stylesheet">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ReelTour","applicationCategory":"MultimediaApplication","operatingSystem":"Web","description":"Turn real estate listing photos into a cinematic property tour video in 24 hours.","offers":{"@type":"Offer","price":"10","priceCurrency":"USD"},"aggregateRating":{"@type":"AggregateRating","ratingValue":"4.9","ratingCount":"128"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"ReelTour","applicationCategory":"MultimediaApplication","operatingSystem":"Web","description":"Turn real estate listing photos into a cinematic property tour video in 24 hours.","offers":{"@type":"Offer","price":"19","priceCurrency":"USD","priceValidUntil":"2027-12-31","description":"Unlimited property tour videos, monthly subscription"},"aggregateRating":{"@type":"AggregateRating","ratingValue":"4.9","ratingCount":"128"}}
 </script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
@@ -115,7 +115,7 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
       <a class="btn" href="reeltour.html">Create your first tour</a>
       <a class="btn ghost" href="#examples">See examples</a>
     </div>
-    <p class="trust">Ready in 24 hours · Works on phone &amp; desktop · From $10 a video</p>
+    <p class="trust">Ready in 24 hours · Works on phone &amp; desktop · $19/mo unlimited</p>
   </div>
   <div class="herovid">
     <video autoplay muted loop playsinline
@@ -172,26 +172,38 @@ footer{border-top:1px solid var(--line);padding:36px 0;color:var(--muted);font-s
   </div>
   <div class="value">
     <div class="card"><div class="big">4×</div><h3>More inquiries</h3><p>Listings with video drive up to four times more inquiries than photos alone.</p></div>
-    <div class="card"><div class="big">$10</div><h3>vs $300 for a crew</h3><p>Skip the videographer and the three-day wait. A finished tour costs the price of lunch.</p></div>
+    <div class="card"><div class="big">$19</div><h3>vs $300 per video</h3><p>Unlimited tours for less than one videographer visit. Skip the crew and the three-day wait.</p></div>
     <div class="card"><div class="big">24h</div><h3>Turnaround</h3><p>Send photos today, post your cinematic tour tomorrow. Every new listing, ready to go.</p></div>
   </div>
 </div></section>
 
 <section id="pricing"><div class="wrap center">
   <span class="eyebrow">Simple pricing</span>
-  <h2 class="sec display" style="margin-top:12px;">One price. One video.</h2>
+  <h2 class="sec display" style="margin-top:12px;">Unlimited tours, one flat price.</h2>
   <div class="price">
-    <div class="amt">$10<small> / video</small></div>
+    <div class="amt">$19<small> / month</small></div>
     <ul>
-      <li>Cinematic room-to-room tour</li>
+      <li><b>Unlimited</b> cinematic tour videos</li>
+      <li>Every new listing, every month</li>
       <li>Title card with address &amp; price</li>
       <li>Vertical (Reels) or horizontal (MLS)</li>
-      <li>Delivered in 24 hours</li>
-      <li>First tour risk-free</li>
+      <li>Cancel anytime</li>
     </ul>
-    <div><a class="btn" href="reeltour.html">Create a tour</a></div>
+    <div id="paypal-button-container"></div>
+    <div style="margin-top:10px;"><a class="btn ghost" href="reeltour.html">Try it first</a></div>
+    <p style="font-size:12px;color:var(--muted);margin-top:12px;">Secure checkout via PayPal.</p>
   </div>
 </div></section>
+<!-- PayPal subscription: fill CLIENT_ID + PLAN_ID, then uncomment
+<script src="https://www.paypal.com/sdk/js?client-id=CLIENT_ID&vault=true&intent=subscription"></script>
+<script>
+paypal.Buttons({
+  style:{shape:'rect',color:'blue',layout:'vertical',label:'subscribe'},
+  createSubscription:(data,actions)=>actions.subscription.create({plan_id:'PLAN_ID'}),
+  onApprove:(data)=>{localStorage.setItem('reeltour_sub',data.subscriptionID);location.href='reeltour.html?subscribed=1';}
+}).render('#paypal-button-container');
+</script>
+-->
 
 <section id="faq"><div class="wrap">
   <div class="center"><span class="eyebrow">Questions</span><h2 class="sec display" style="margin-top:12px;">Frequently asked</h2></div>
