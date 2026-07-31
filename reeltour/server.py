@@ -37,8 +37,8 @@ RAPIDAPI_KEY   = os.environ.get("RAPIDAPI_KEY", "")
 RAPIDAPI_HOST  = os.environ.get("RAPIDAPI_HOST", "us-real-estate-listings.p.rapidapi.com")
 
 HF_BASE        = "https://platform.higgsfield.ai/v1"
-HF_MODEL       = os.environ.get("HF_MODEL", "dop-turbo")   # dop-lite | dop-preview | dop-turbo
-MAX_PHOTOS     = int(os.environ.get("MAX_PHOTOS", "6"))    # 6 photos -> 5 continuous transitions
+HF_MODEL       = os.environ.get("HF_MODEL", "dop-preview")  # dop-lite | dop-preview (best) | dop-turbo
+MAX_PHOTOS     = int(os.environ.get("MAX_PHOTOS", "5"))     # 5 photos -> 4 continuous transitions
 
 TOUR_PROMPT = (
     "slow continuous cinematic drone glide moving forward through the home, "
