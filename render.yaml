@@ -2,7 +2,7 @@ services:
   - type: web
     name: reeltour-api
     runtime: python
-    plan: starter
+    plan: free
     rootDir: reeltour
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
