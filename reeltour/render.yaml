@@ -19,3 +19,5 @@ services:
         value: dop-preview
       - key: CORS_ORIGINS
         value: "*"
+      - key: PYTHON_VERSION
+        value: "3.12.7"
