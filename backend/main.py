@@ -1248,6 +1248,16 @@ def run_marketing_batch(token: str = Query(""), db: Session = Depends(get_db)):
     return mk.build_daily_batch(db)
 
 
+@app.post("/marketing/source/run")
+def run_marketing_source(token: str = Query(""), db: Session = Depends(get_db)):
+    """Pull new business numbers now from Google Places. Guard with ADMIN_TOKEN."""
+    admin = os.getenv("ADMIN_TOKEN", "")
+    if admin and token != admin:
+        raise HTTPException(403, "Invalid or missing admin token.")
+    from sources import auto_source_prospects
+    return {"added": auto_source_prospects(db)}
+
+
 @app.get("/marketing/batch/today")
 def marketing_batch_today(db: Session = Depends(get_db)):
     """Today's queued WhatsApp messages with click-to-send links (manual mode)."""

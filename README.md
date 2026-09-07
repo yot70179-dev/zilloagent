@@ -103,8 +103,13 @@ email and LinkedIn, then rolls everything up at month end.
   American owners**, each personalised by Claude (Hebrew for IL, English for US).
 - Sends one message per hour during business hours (auto mode).
 - When a prospect replies, **emails you the reply immediately**.
-- Auto-imports new prospects daily from `prospects_inbox.csv` (see
-  `prospects_inbox.sample.csv` for the format).
+- **Sources new numbers automatically every day** via the official Google Places
+  API — the phone a business *published* for contact (for a solo business, usually
+  the owner's own mobile). Configure with `GOOGLE_PLACES_API_KEY` +
+  `MK_SOURCE_QUERIES`. Also auto-imports from `prospects_inbox.csv`
+  (see `prospects_inbox.sample.csv`).
+  > We never scrape *private* personal numbers from social networks or data
+  > brokers — that's illegal and gets a WhatsApp number banned.
 - Emails you a full activity summary on the 1st of each month.
 
 **Two delivery modes**
@@ -125,6 +130,7 @@ email and LinkedIn, then rolls everything up at month end.
 
 | Method | Path | Description |
 |--------|------|-------------|
+| POST | `/marketing/source/run` | Pull new business numbers now from Google Places |
 | POST | `/marketing/prospects` | Add a prospect |
 | GET | `/marketing/prospects` | List prospects (filter by `segment`, `status`) |
 | POST | `/marketing/batch/run` | Build today's WhatsApp batch now (guard with `ADMIN_TOKEN`) |
@@ -133,6 +139,7 @@ email and LinkedIn, then rolls everything up at month end.
 | GET/POST | `/webhooks/whatsapp` | Meta Cloud API verification + inbound replies |
 
 Configure via the `MK_*` and `WHATSAPP_*` variables in `.env.example`.
+To turn on auto-send from your own number, follow **`SETUP_WHATSAPP.md`**.
 
 ## Compliance
 

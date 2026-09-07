@@ -28,7 +28,9 @@ from database import (
     Agent, MonthlyReport, Prospect, ProspectMessage, ProspectStatus, SessionLocal,
 )
 from message_sender import MessageSender
-from whatsapp_sender import WhatsAppSender, normalize_phone, wa_link
+from whatsapp_sender import (
+    TEMPLATE_NAME, WhatsAppSender, normalize_phone, render_template, wa_link,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -49,24 +51,29 @@ _MODEL = os.getenv("MK_MODEL", "claude-sonnet-4-20250514")
 #  Message generation
 # ══════════════════════════════════════════════════════════════════════════════
 
+SENDER_NAME    = os.getenv("MK_SENDER_NAME", "יותם")
+SENDER_NAME_EN = os.getenv("MK_SENDER_NAME_EN", "Yotam")
+
+
 def _fallback_message(p: Prospect) -> str:
     name = (p.name or "").split()[0] if p.name else ""
     biz  = p.business_name or ""
     if p.segment == "US":
         hi = f"Hi {name}, " if name else "Hi, "
-        about = f"I came across {biz} and " if biz else "I "
+        forwho = f" for {biz}" if biz else ""
         return (
-            f"{hi}{about}I build fast, conversion-focused landing pages for "
-            f"businesses like yours. I'd love to send over a free mockup of what "
-            f"a page for you could look like — no obligation. Would that be useful?"
+            f"{hi}I'm {SENDER_NAME_EN}, a landing-page designer. I built a sample landing "
+            f"page{forwho} just to show how it could look — it's only an initial sample. "
+            f"If you'd like, I'll happily send it over, and we can take it to something "
+            f"custom and real. Thanks for your time!"
         )
     # Hebrew (IL)
     hi = f"היי {name}, " if name else "היי, "
-    about = f"ראיתי את {biz} ו" if biz else ""
+    forwho = f" ל{biz}" if biz else ""
     return (
-        f"{hi}{about}אני בונה דפי נחיתה מהירים שממירים גולשים ללקוחות. "
-        f"אשמח להכין לך הדגמה חינם של דף נחיתה מותאם לעסק שלך, בלי התחייבות. "
-        f"מעניין אותך שאשלח?"
+        f"{hi}שמי {SENDER_NAME}, מעצב דפי נחיתה. בניתי דוגמה של דף נחיתה{forwho} רק כדי "
+        f"להראות איך זה יכול להיראות — חשוב לי שתדע/י שזו דוגמה ראשונית בלבד. "
+        f"אם תרצה/י אשמח לשלוח לך אותה, ונוכל להתקדם למשהו מותאם ואמיתי. תודה על זמנך!"
     )
 
 
@@ -77,6 +84,7 @@ def generate_pitch(p: Prospect, channel: str = "whatsapp") -> str:
         return base
 
     lang = "Hebrew" if p.segment == "IL" else "English"
+    sender = SENDER_NAME if p.segment == "IL" else SENDER_NAME_EN
     length = "under 45 words" if channel == "whatsapp" else "under 90 words"
     facts = ", ".join(f for f in [
         f"name={p.name}" if p.name else "",
@@ -95,10 +103,15 @@ def generate_pitch(p: Prospect, channel: str = "whatsapp") -> str:
                 "model": _MODEL,
                 "max_tokens": 300,
                 "system": (
-                    f"You write warm, non-spammy first-contact {channel} messages in {lang} "
-                    f"offering to build a landing page for a small-business owner. "
-                    f"Rules: {length}; reference a detail if given; one clear soft ask; "
-                    f"no emojis spam; no opt-out line (added separately). Return ONLY the message."
+                    f"You are {sender}, a friendly, humble beginner landing-page designer "
+                    f"writing a first-contact {channel} message in {lang} to a small-business owner. "
+                    f"Voice: you introduce yourself by name, say you built a SAMPLE landing page just "
+                    f"to show how it could look, stress it's only an initial sample, and offer to send "
+                    f"it and take it further into something custom and real if they want. End warmly "
+                    f"(e.g. 'thanks for your time'). "
+                    f"Rules: {length}; personalise with the name/business if given; genuine and "
+                    f"non-pushy; no hype, no emoji spam; no opt-out line (added separately). "
+                    f"Return ONLY the message text."
                 ),
                 "messages": [{"role": "user", "content": f"Prospect: {facts}\n\nReference draft: {base}"}],
             },
@@ -286,6 +299,12 @@ def build_daily_batch(db: Session) -> dict:
     """Pick today's prospects (10 IL + 5 US), generate their WhatsApp pitch,
     store them as pending ProspectMessages. In manual mode also emails the user
     the batch with click-to-send links. Idempotent per day."""
+    # pull new business numbers automatically (Google Places), then the CSV inbox
+    try:
+        from sources import auto_source_prospects
+        auto_source_prospects(db)
+    except Exception as exc:
+        logger.error("auto_source_prospects failed: %s", exc)
     import_inbox_csv(db)
     wa = WhatsAppSender()
     result = {"IL": 0, "US": 0, "mode": "auto" if wa.auto_enabled else "manual"}
@@ -305,21 +324,27 @@ def build_daily_batch(db: Session) -> dict:
             .limit(remaining).all()
         )
         for p in prospects:
-            pitch = generate_pitch(p, channel="whatsapp")
-            link  = wa_link(p.phone, pitch)
+            first = (p.name or "").split()[0] if p.name else ""
+            biz = p.business_name or ""
             if wa.auto_enabled:
-                # queued for the hourly sender to deliver via the Cloud API
+                # Cloud API cold contact must use the approved template; store the
+                # rendered template text (what the recipient will see) for preview.
+                content = (render_template(p.language, first, biz) if TEMPLATE_NAME
+                           else generate_pitch(p, channel="whatsapp"))
+                link = wa_link(p.phone, content)
                 db.add(ProspectMessage(
                     prospect_id=p.id, channel="whatsapp", direction="outbound",
-                    content=pitch, wa_link=link, mode="auto", status="pending",
+                    content=content, wa_link=link, mode="auto", status="pending",
                 ))
                 p.status = ProspectStatus.QUEUED
             else:
                 # manual mode: handed to the user (batch email + /batch/today), so
                 # it counts as an outbound touch right away
+                pitch = generate_pitch(p, channel="whatsapp")
                 db.add(ProspectMessage(
                     prospect_id=p.id, channel="whatsapp", direction="outbound",
-                    content=pitch, wa_link=link, mode="manual", status="queued_manual",
+                    content=pitch, wa_link=wa_link(p.phone, pitch),
+                    mode="manual", status="queued_manual",
                 ))
                 p.status = ProspectStatus.CONTACTED
                 p.last_contacted_at = datetime.utcnow()
