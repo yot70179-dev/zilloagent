@@ -92,6 +92,27 @@ class WhatsAppSender:
     def auto_enabled(self) -> bool:
         return bool(self.token and self.phone_id)
 
+    def verify(self) -> dict:
+        """Live check that token + phone_id work against the Graph API.
+        Returns a dict with 'ok' plus the verified number info (no secrets)."""
+        if not self.auto_enabled:
+            return {"ok": False, "reason": "WHATSAPP_TOKEN / WHATSAPP_PHONE_ID not set"}
+        try:
+            r = httpx.get(
+                f"https://graph.facebook.com/{GRAPH_VERSION}/{self.phone_id}",
+                params={"fields": "display_phone_number,verified_name,quality_rating"},
+                headers={"Authorization": f"Bearer {self.token}"},
+                timeout=15,
+            )
+            data = r.json()
+            if r.status_code >= 400:
+                return {"ok": False, "reason": data.get("error", {}).get("message", str(data))}
+            return {"ok": True, "number": data.get("display_phone_number"),
+                    "verified_name": data.get("verified_name"),
+                    "quality_rating": data.get("quality_rating")}
+        except Exception as exc:
+            return {"ok": False, "reason": str(exc)}
+
     def send(self, phone: str, message: str, language: str = "he",
              template_params: Optional[list] = None) -> Tuple[str, Optional[str], str]:
         """

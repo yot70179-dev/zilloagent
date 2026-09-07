@@ -1248,6 +1248,43 @@ def run_marketing_batch(token: str = Query(""), db: Session = Depends(get_db)):
     return mk.build_daily_batch(db)
 
 
+@app.get("/marketing/whatsapp/status")
+def whatsapp_status():
+    """Diagnostic: is the WhatsApp Cloud API wired correctly? Reveals no secrets."""
+    from whatsapp_sender import WhatsAppSender, TEMPLATE_NAME
+    wa = WhatsAppSender()
+    return {
+        "has_token":        bool(wa.token),
+        "has_phone_id":     bool(wa.phone_id),
+        "has_template":     bool(TEMPLATE_NAME),
+        "template_name":    TEMPLATE_NAME or None,
+        "verify_token_set": bool(os.getenv("WHATSAPP_VERIFY_TOKEN")),
+        "report_email_set": bool(os.getenv("MK_REPORT_EMAIL") or os.getenv("GMAIL_USER")),
+        "mode":             "auto" if wa.auto_enabled else "manual",
+        "meta_check":       wa.verify(),
+    }
+
+
+@app.post("/marketing/whatsapp/test")
+def whatsapp_test(to: str = Query(...), token: str = Query(""),
+                  name: str = Query("יותם"), business: str = Query("העסק שלך")):
+    """Send ONE test message to your own number to confirm end-to-end delivery.
+    Guard with ADMIN_TOKEN. Uses the template if configured, else free-form text."""
+    admin = os.getenv("ADMIN_TOKEN", "")
+    if admin and token != admin:
+        raise HTTPException(403, "Invalid or missing admin token.")
+    from whatsapp_sender import WhatsAppSender, TEMPLATE_NAME, render_template
+    wa = WhatsAppSender()
+    lang = "en" if to.strip().startswith(("+1", "1")) else "he"
+    if TEMPLATE_NAME:
+        text = render_template(lang, name, business)
+        status, ext_id, link = wa.send(to, text, lang, template_params=[name, business])
+    else:
+        text = render_template(lang, name, business)
+        status, ext_id, link = wa.send(to, text, lang)
+    return {"status": status, "external_id": ext_id, "preview": text, "wa_link": link}
+
+
 @app.post("/marketing/source/run")
 def run_marketing_source(token: str = Query(""), db: Session = Depends(get_db)):
     """Pull new business numbers now from Google Places. Guard with ADMIN_TOKEN."""
