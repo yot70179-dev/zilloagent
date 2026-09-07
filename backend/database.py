@@ -206,6 +206,88 @@ class DailyStats(Base):
     hot_leads        = Column(Integer, default=0)
 
 
+# ══════════════════════════════════════════════════════════════════════════════
+#  Marketing agent — landing-page outreach to business owners (IL + US)
+#  Additive models; independent of the real-estate (Zillow) flow above.
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ProspectStatus(str, enum.Enum):
+    NEW       = "new"        # in the pool, not yet queued
+    QUEUED    = "queued"     # picked for today's batch, message generated
+    CONTACTED = "contacted"  # message actually sent / handed to user
+    REPLIED   = "replied"    # prospect answered
+    OPTED_OUT = "opted_out"  # asked to stop — never contact again
+    DONE       = "done"       # closed / not relevant
+
+
+class Prospect(Base):
+    """A business owner we may pitch a landing page to."""
+    __tablename__ = "prospects"
+
+    id             = Column(Integer, primary_key=True)
+    agent_id       = Column(Integer, ForeignKey("agents.id"), nullable=True)
+
+    segment        = Column(String(4),  default="IL")   # "IL" (Hebrew) | "US" (English)
+    language       = Column(String(4),  default="he")   # "he" | "en"
+    name           = Column(String(200), nullable=True)
+    business_name  = Column(String(200), nullable=True)
+    industry       = Column(String(120), nullable=True)
+
+    phone          = Column(String(40), nullable=True)   # E.164, used for WhatsApp
+    email          = Column(String(200), nullable=True)
+    linkedin_url   = Column(String(400), nullable=True)
+    source         = Column(String(120), nullable=True)  # where the lead came from
+
+    status         = Column(String(20), default=ProspectStatus.NEW)
+    opted_out      = Column(Boolean, default=False)
+    last_contacted_at = Column(DateTime, nullable=True)
+    notes          = Column(Text, nullable=True)
+    created_at     = Column(DateTime, default=datetime.utcnow)
+
+    outreach = relationship("ProspectMessage", back_populates="prospect")
+
+
+class ProspectMessage(Base):
+    """One outbound/inbound touch to a prospect, on any channel."""
+    __tablename__ = "prospect_messages"
+
+    id           = Column(Integer, primary_key=True)
+    prospect_id  = Column(Integer, ForeignKey("prospects.id"))
+    channel      = Column(String(20))   # whatsapp | email | linkedin | call
+    direction    = Column(String(10), default="outbound")
+    content      = Column(Text, nullable=False)
+    subject      = Column(String(500), nullable=True)   # email subject
+    wa_link      = Column(String(600), nullable=True)   # click-to-send link (manual mode)
+    mode         = Column(String(10), default="manual") # manual | auto
+    status       = Column(String(20), default="pending")# pending | sent | queued_manual | failed
+    external_id  = Column(String(200), nullable=True)
+    sent_at      = Column(DateTime, nullable=True)
+    created_at   = Column(DateTime, default=datetime.utcnow)
+
+    prospect = relationship("Prospect", back_populates="outreach")
+
+
+class MonthlyReport(Base):
+    """End-of-month roll-up of all marketing outreach."""
+    __tablename__ = "monthly_reports"
+
+    id                = Column(Integer, primary_key=True)
+    agent_id          = Column(Integer, ForeignKey("agents.id"), nullable=True)
+    year              = Column(Integer, nullable=False)
+    month             = Column(Integer, nullable=False)
+    generated_at      = Column(DateTime, default=datetime.utcnow)
+
+    prospects_added   = Column(Integer, default=0)
+    whatsapp_sent_il  = Column(Integer, default=0)
+    whatsapp_sent_us  = Column(Integer, default=0)
+    emails_sent       = Column(Integer, default=0)
+    linkedin_sent     = Column(Integer, default=0)
+    calls_made        = Column(Integer, default=0)
+    replies           = Column(Integer, default=0)
+    opt_outs          = Column(Integer, default=0)
+    summary_text      = Column(Text, nullable=True)
+
+
 def get_db():
     db = SessionLocal()
     try:

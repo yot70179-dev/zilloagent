@@ -92,6 +92,48 @@ pytest tests/ -v
 
 Hard-coded to 250/day via `DAILY_MESSAGE_LIMIT` env var. The limit is checked before every send; once reached all outreach stops until midnight UTC.
 
+## Marketing agent — landing-page outreach
+
+An add-on that pitches your landing-page service to business owners over WhatsApp,
+email and LinkedIn, then rolls everything up at month end.
+
+**What it does**
+- Keeps a pool of prospects (Israeli + American business owners).
+- Every morning builds a batch of **10 WhatsApp messages to Israeli owners + 5 to
+  American owners**, each personalised by Claude (Hebrew for IL, English for US).
+- Sends one message per hour during business hours (auto mode).
+- When a prospect replies, **emails you the reply immediately**.
+- Auto-imports new prospects daily from `prospects_inbox.csv` (see
+  `prospects_inbox.sample.csv` for the format).
+- Emails you a full activity summary on the 1st of each month.
+
+**Two delivery modes**
+- **Manual (default, zero-risk):** no WhatsApp API configured → the agent builds a
+  ready-to-send `wa.me` link per message and emails you the daily batch. You tap and
+  send. Your personal WhatsApp is never automated, so it can't be banned.
+- **Auto:** set `WHATSAPP_TOKEN` + `WHATSAPP_PHONE_ID` for the **official Meta
+  WhatsApp Cloud API** → the agent sends by itself, one per hour, with an opt-out
+  footer on every message.
+
+> ⚠️ Automating a *personal* WhatsApp/LinkedIn account for cold bulk messaging gets
+> the account banned and breaks Israel's Amendment 40 and the US TCPA. That path is
+> intentionally not built. Use manual mode, or the official Cloud API with opt-in
+> templates. Every message carries an opt-out line; opted-out prospects are never
+> re-contacted.
+
+**Endpoints**
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/marketing/prospects` | Add a prospect |
+| GET | `/marketing/prospects` | List prospects (filter by `segment`, `status`) |
+| POST | `/marketing/batch/run` | Build today's WhatsApp batch now (guard with `ADMIN_TOKEN`) |
+| GET | `/marketing/batch/today` | Today's messages + click-to-send links |
+| GET | `/marketing/report/{year}/{month}` | Generate/return a monthly summary |
+| GET/POST | `/webhooks/whatsapp` | Meta Cloud API verification + inbound replies |
+
+Configure via the `MK_*` and `WHATSAPP_*` variables in `.env.example`.
+
 ## Compliance
 
 - Every outgoing SMS includes "Reply STOP to unsubscribe."

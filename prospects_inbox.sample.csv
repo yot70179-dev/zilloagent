@@ -1,0 +1,4 @@
+segment,name,business_name,phone,email,linkedin_url,industry,source
+IL,דנה כהן,מספרת דנה,0501234567,dana@example.com,,מספרה,instagram
+IL,יוסי לוי,יוסי שיפוצים,0527654321,,,שיפוצים,google_maps
+US,John Smith,Smith Plumbing,+13105551234,john@example.com,https://linkedin.com/in/johnsmith,plumbing,referral

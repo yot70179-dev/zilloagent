@@ -3,7 +3,7 @@ ZilloAgent FastAPI backend — multi-tenant, consent-based.
 """
 import logging
 import os
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -54,6 +54,58 @@ def on_startup():
     create_tables()
     logger.info("ZilloAgent backend started")
     _start_outreach_scheduler()
+    _start_marketing_scheduler()
+
+
+def _start_marketing_scheduler():
+    """Landing-page marketing agent: daily WhatsApp batch (10 IL + 5 US),
+    hourly send, and end-of-month report. Independent of the call scheduler."""
+    if os.getenv("MK_ENABLED", "true").lower() != "true":
+        logger.info("Marketing scheduler disabled (set MK_ENABLED=true to enable).")
+        return
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        import marketing_agent as mk
+    except Exception as e:
+        logger.warning("Marketing scheduler not started (import failed): %s", e)
+        return
+
+    def _daily():
+        db = SessionLocal()
+        try:
+            logger.info("Marketing daily batch: %s", mk.build_daily_batch(db))
+        finally:
+            db.close()
+
+    def _hourly():
+        db = SessionLocal()
+        try:
+            mk.send_next_whatsapp(db)
+        finally:
+            db.close()
+
+    def _monthly():
+        db = SessionLocal()
+        try:
+            prev = (datetime.utcnow().replace(day=1) - timedelta(days=1))
+            mk.generate_monthly_report(db, prev.year, prev.month)
+        finally:
+            db.close()
+
+    sched = BackgroundScheduler(timezone="UTC")
+    # 06:30 UTC ≈ 09:30 Israel — plan today's batch
+    sched.add_job(_daily, CronTrigger(hour=6, minute=30),
+                  id="mk::daily", replace_existing=True, misfire_grace_time=3600, coalesce=True)
+    # every hour at :05 — send one queued WhatsApp (auto mode only)
+    sched.add_job(_hourly, CronTrigger(minute=5),
+                  id="mk::hourly", replace_existing=True, misfire_grace_time=600, coalesce=True)
+    # 1st of month, 07:00 UTC — email the monthly summary
+    sched.add_job(_monthly, CronTrigger(day=1, hour=7, minute=0),
+                  id="mk::monthly", replace_existing=True, misfire_grace_time=7200, coalesce=True)
+    sched.start()
+    app.state.mk_scheduler = sched
+    logger.info("Marketing scheduler: daily batch 06:30 UTC, hourly send, monthly report on the 1st.")
 
 
 def _start_outreach_scheduler():
@@ -1130,6 +1182,139 @@ def _log_message(db: Session, lead_id: int, msg_type: str, direction: str,
     )
     db.add(msg)
     db.flush()
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+#  Marketing agent — landing-page outreach endpoints
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ProspectIn(BaseModel):
+    segment: str = "IL"          # "IL" | "US"
+    name: str = ""
+    business_name: str = ""
+    phone: str = ""
+    email: str = ""
+    linkedin_url: str = ""
+    industry: str = ""
+    source: str = "api"
+
+
+def _prospect_dict(p) -> dict:
+    return {
+        "id": p.id, "segment": p.segment, "name": p.name,
+        "business_name": p.business_name, "industry": p.industry,
+        "phone": p.phone, "email": p.email, "linkedin_url": p.linkedin_url,
+        "status": p.status, "opted_out": p.opted_out, "source": p.source,
+        "last_contacted_at": p.last_contacted_at.isoformat() if p.last_contacted_at else None,
+        "created_at": p.created_at.isoformat() if p.created_at else None,
+    }
+
+
+@app.post("/marketing/prospects")
+def create_prospect(body: ProspectIn, db: Session = Depends(get_db)):
+    import marketing_agent as mk
+    p = mk.add_prospect(
+        db, segment=body.segment, name=body.name, business_name=body.business_name,
+        phone=body.phone, email=body.email, linkedin_url=body.linkedin_url,
+        industry=body.industry, source=body.source,
+    )
+    return _prospect_dict(p)
+
+
+@app.get("/marketing/prospects")
+def list_prospects(
+    segment: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = Query(100, le=1000),
+    db: Session = Depends(get_db),
+):
+    from database import Prospect
+    q = db.query(Prospect)
+    if segment:
+        q = q.filter(Prospect.segment == segment.upper())
+    if status:
+        q = q.filter(Prospect.status == status)
+    rows = q.order_by(Prospect.created_at.desc()).limit(limit).all()
+    return [_prospect_dict(p) for p in rows]
+
+
+@app.post("/marketing/batch/run")
+def run_marketing_batch(token: str = Query(""), db: Session = Depends(get_db)):
+    """Build today's WhatsApp batch now (10 IL + 5 US). Guard with ADMIN_TOKEN."""
+    admin = os.getenv("ADMIN_TOKEN", "")
+    if admin and token != admin:
+        raise HTTPException(403, "Invalid or missing admin token.")
+    import marketing_agent as mk
+    return mk.build_daily_batch(db)
+
+
+@app.get("/marketing/batch/today")
+def marketing_batch_today(db: Session = Depends(get_db)):
+    """Today's queued WhatsApp messages with click-to-send links (manual mode)."""
+    from database import ProspectMessage, Prospect
+    start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    rows = (db.query(ProspectMessage)
+            .filter(ProspectMessage.channel == "whatsapp",
+                    ProspectMessage.created_at >= start)
+            .order_by(ProspectMessage.created_at.asc()).all())
+    out = []
+    for m in rows:
+        p = m.prospect
+        out.append({
+            "prospect_id": p.id, "segment": p.segment,
+            "name": p.name, "business_name": p.business_name, "phone": p.phone,
+            "message": m.content, "wa_link": m.wa_link,
+            "mode": m.mode, "status": m.status,
+        })
+    return {"count": len(out), "messages": out}
+
+
+@app.get("/marketing/report/{year}/{month}")
+def marketing_report(year: int, month: int, db: Session = Depends(get_db)):
+    import marketing_agent as mk
+    rpt = mk.generate_monthly_report(db, year, month)
+    return {
+        "year": rpt.year, "month": rpt.month,
+        "prospects_added": rpt.prospects_added,
+        "whatsapp_sent_il": rpt.whatsapp_sent_il,
+        "whatsapp_sent_us": rpt.whatsapp_sent_us,
+        "emails_sent": rpt.emails_sent, "linkedin_sent": rpt.linkedin_sent,
+        "calls_made": rpt.calls_made, "replies": rpt.replies, "opt_outs": rpt.opt_outs,
+        "summary_text": rpt.summary_text,
+    }
+
+
+# ── WhatsApp Cloud API webhook — inbound replies → alert the user immediately ──
+@app.get("/webhooks/whatsapp")
+def whatsapp_verify(request: Request):
+    """Meta webhook verification handshake."""
+    params = request.query_params
+    verify_token = os.getenv("WHATSAPP_VERIFY_TOKEN", "")
+    if params.get("hub.mode") == "subscribe" and params.get("hub.verify_token") == verify_token:
+        return JSONResponse(content=int(params.get("hub.challenge", 0)))
+    raise HTTPException(403, "verification failed")
+
+
+@app.post("/webhooks/whatsapp")
+async def whatsapp_inbound(request: Request, db: Session = Depends(get_db)):
+    """Inbound WhatsApp message from Meta Cloud API. Logs, honours opt-out,
+    and emails the user right away when a prospect replies."""
+    import marketing_agent as mk
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"ok": True}
+    try:
+        for entry in payload.get("entry", []):
+            for change in entry.get("changes", []):
+                value = change.get("value", {})
+                for msg in value.get("messages", []):
+                    frm = msg.get("from", "")
+                    text = (msg.get("text", {}) or {}).get("body", "")
+                    mk.handle_inbound_reply(db, frm, text, channel="whatsapp")
+    except Exception as exc:
+        logger.error("whatsapp_inbound error: %s", exc)
+    return {"ok": True}
 
 
 if __name__ == "__main__":
