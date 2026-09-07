@@ -29,7 +29,8 @@ from database import (
 )
 from message_sender import MessageSender
 from whatsapp_sender import (
-    TEMPLATE_NAME, WhatsAppSender, normalize_phone, render_template, wa_link,
+    TEMPLATE_NAME, WhatsAppSender, followup_template_name, normalize_phone,
+    render_followup, render_template, wa_link,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,6 +38,10 @@ logger = logging.getLogger(__name__)
 # ── Config (env-overridable) ───────────────────────────────────────────────────
 IL_DAILY_CAP = int(os.getenv("MK_IL_DAILY_CAP", "10"))
 US_DAILY_CAP = int(os.getenv("MK_US_DAILY_CAP", "5"))
+# Follow-up cadence (days since the previous touch) and how many follow-ups max.
+FOLLOWUP1_DAYS = int(os.getenv("MK_FOLLOWUP1_DAYS", "3"))
+FOLLOWUP2_DAYS = int(os.getenv("MK_FOLLOWUP2_DAYS", "4"))   # days after follow-up #1
+MAX_FOLLOWUPS  = int(os.getenv("MK_MAX_FOLLOWUPS", "2"))
 IL_TZ = pytz.timezone(os.getenv("MK_IL_TZ", "Asia/Jerusalem"))
 US_TZ = pytz.timezone(os.getenv("MK_US_TZ", "America/New_York"))
 BUSINESS_HOURS = (9, 21)  # inclusive-exclusive, local time
@@ -307,53 +312,122 @@ def build_daily_batch(db: Session) -> dict:
         logger.error("auto_source_prospects failed: %s", exc)
     import_inbox_csv(db)
     wa = WhatsAppSender()
-    result = {"IL": 0, "US": 0, "mode": "auto" if wa.auto_enabled else "manual"}
+    result = {"IL": 0, "US": 0, "followups": 0,
+              "mode": "auto" if wa.auto_enabled else "manual"}
 
     for segment, cap in (("IL", IL_DAILY_CAP), ("US", US_DAILY_CAP)):
         already = _sent_today(db, segment) + _pending_today(db, segment)
         remaining = max(0, cap - already)
         if remaining == 0:
             continue
-        prospects = (
-            db.query(Prospect)
-            .filter(Prospect.segment == segment,
-                    Prospect.status == ProspectStatus.NEW,
-                    Prospect.opted_out == False,          # noqa: E712
-                    Prospect.phone.isnot(None))
-            .order_by(Prospect.created_at.asc())
-            .limit(remaining).all()
-        )
-        for p in prospects:
-            first = (p.name or "").split()[0] if p.name else ""
-            biz = p.business_name or ""
-            if wa.auto_enabled:
-                # Cloud API cold contact must use the approved template; store the
-                # rendered template text (what the recipient will see) for preview.
-                content = (render_template(p.language, first, biz) if TEMPLATE_NAME
-                           else generate_pitch(p, channel="whatsapp"))
-                link = wa_link(p.phone, content)
-                db.add(ProspectMessage(
-                    prospect_id=p.id, channel="whatsapp", direction="outbound",
-                    content=content, wa_link=link, mode="auto", status="pending",
-                ))
-                p.status = ProspectStatus.QUEUED
-            else:
-                # manual mode: handed to the user (batch email + /batch/today), so
-                # it counts as an outbound touch right away
-                pitch = generate_pitch(p, channel="whatsapp")
-                db.add(ProspectMessage(
-                    prospect_id=p.id, channel="whatsapp", direction="outbound",
-                    content=pitch, wa_link=wa_link(p.phone, pitch),
-                    mode="manual", status="queued_manual",
-                ))
-                p.status = ProspectStatus.CONTACTED
-                p.last_contacted_at = datetime.utcnow()
+
+        # 1) follow-ups first — they convert better, and this keeps total daily
+        #    volume inside the safe cap instead of stacking on top of it.
+        for p, stage in _eligible_followups(db, segment, remaining):
+            _queue_whatsapp(db, wa, p, stage)
             result[segment] += 1
+            result["followups"] += 1
+            remaining -= 1
+
+        # 2) fill the rest of the budget with brand-new prospects
+        if remaining > 0:
+            prospects = (
+                db.query(Prospect)
+                .filter(Prospect.segment == segment,
+                        Prospect.status == ProspectStatus.NEW,
+                        Prospect.opted_out == False,          # noqa: E712
+                        Prospect.phone.isnot(None))
+                .order_by(Prospect.created_at.asc())
+                .limit(remaining).all()
+            )
+            for p in prospects:
+                _queue_whatsapp(db, wa, p, 0)
+                result[segment] += 1
         db.commit()
 
     if result["mode"] == "manual" and (result["IL"] or result["US"]) and REPORT_EMAIL:
         _email_manual_batch(db, REPORT_EMAIL)
     return result
+
+
+def _has_open_whatsapp(db: Session, prospect_id: int) -> bool:
+    """True if this prospect has an auto-mode message still waiting to be sent.
+    (In manual mode 'queued_manual' is terminal — handed to the user — so it does
+    NOT block the next follow-up.)"""
+    return db.query(ProspectMessage.id).filter(
+        ProspectMessage.prospect_id == prospect_id,
+        ProspectMessage.channel == "whatsapp",
+        ProspectMessage.status == "pending",
+    ).first() is not None
+
+
+def _eligible_followups(db: Session, segment: str, limit: int):
+    """Prospects contacted but not replied, whose next follow-up is due.
+    Returns [(prospect, next_stage)]."""
+    now = datetime.utcnow()
+    stage1_cut = now - timedelta(days=FOLLOWUP1_DAYS)
+    stage2_cut = now - timedelta(days=FOLLOWUP2_DAYS)
+    candidates = (
+        db.query(Prospect)
+        .filter(Prospect.segment == segment,
+                Prospect.status == ProspectStatus.CONTACTED,
+                Prospect.opted_out == False,              # noqa: E712
+                Prospect.followup_count < MAX_FOLLOWUPS,
+                Prospect.phone.isnot(None))
+        .order_by(Prospect.last_contacted_at.asc().nullsfirst())
+        .all()
+    )
+    out = []
+    for p in candidates:
+        if len(out) >= limit:
+            break
+        if _has_open_whatsapp(db, p.id):
+            continue
+        fc = p.followup_count or 0
+        if fc == 0:
+            due = (p.last_contacted_at or p.created_at) <= stage1_cut
+        else:
+            due = (p.last_followup_at or p.last_contacted_at or p.created_at) <= stage2_cut
+        if due:
+            out.append((p, fc + 1))
+    return out
+
+
+def _queue_whatsapp(db: Session, wa: WhatsAppSender, p: Prospect, stage: int):
+    """Queue one WhatsApp message (stage 0 = cold first-contact, 1/2 = follow-up)."""
+    first = (p.name or "").split()[0] if p.name else ""
+    biz = p.business_name or ""
+    is_fu = stage >= 1
+    if is_fu:
+        content = render_followup(stage, p.language, first, biz)
+        tmpl = followup_template_name(stage) or None
+    elif wa.auto_enabled and TEMPLATE_NAME:
+        content = render_template(p.language, first, biz)   # approved template copy
+        tmpl = TEMPLATE_NAME
+    else:
+        content = generate_pitch(p, channel="whatsapp")     # personalised free-form
+        tmpl = None
+
+    msg = ProspectMessage(
+        prospect_id=p.id, channel="whatsapp", direction="outbound",
+        content=content, wa_link=wa_link(p.phone, content),
+        is_followup=is_fu, template_name=tmpl,
+        mode="auto" if wa.auto_enabled else "manual",
+        status="pending" if wa.auto_enabled else "queued_manual",
+    )
+    db.add(msg)
+
+    if wa.auto_enabled:
+        if not is_fu:
+            p.status = ProspectStatus.QUEUED   # send_next_whatsapp flips to CONTACTED
+    else:
+        # manual mode: handed to the user right away, so advance counters now
+        if is_fu:
+            p.followup_count = (p.followup_count or 0) + 1
+            p.last_followup_at = datetime.utcnow()
+        else:
+            p.status = ProspectStatus.CONTACTED
+        p.last_contacted_at = datetime.utcnow()
 
 
 def _pending_today(db: Session, segment: str) -> int:
@@ -402,16 +476,29 @@ def send_next_whatsapp(db: Session) -> Optional[dict]:
         if not msg:
             continue
         p = msg.prospect
-        status, ext_id, link = wa.send(p.phone, msg.content, p.language)
+        first = (p.name or "").split()[0] if p.name else ""
+        biz = p.business_name or ""
+        params = [first or ("שלום" if p.language == "he" else "there"),
+                  biz or ("העסק שלך" if p.language == "he" else "your business")]
+        status, ext_id, link = wa.send(
+            p.phone, msg.content, p.language,
+            template_params=params if msg.template_name else None,
+            template_name=msg.template_name,
+        )
         msg.status = status
         msg.external_id = ext_id
         msg.wa_link = link
         if status == "sent":
             msg.sent_at = datetime.utcnow()
-            p.status = ProspectStatus.CONTACTED
             p.last_contacted_at = datetime.utcnow()
+            if msg.is_followup:
+                p.followup_count = (p.followup_count or 0) + 1
+                p.last_followup_at = datetime.utcnow()
+            else:
+                p.status = ProspectStatus.CONTACTED
         db.commit()
-        return {"prospect_id": p.id, "segment": segment, "status": status}
+        return {"prospect_id": p.id, "segment": segment,
+                "followup": bool(msg.is_followup), "status": status}
     return None
 
 
@@ -505,6 +592,12 @@ def generate_monthly_report(db: Session, year: int, month: int,
     opt_outs = (db.query(func.count(Prospect.id))
                 .filter(Prospect.opted_out == True,                       # noqa: E712
                         Prospect.created_at >= start, Prospect.created_at < end).scalar() or 0)
+    followups = (db.query(func.count(ProspectMessage.id))
+                 .filter(ProspectMessage.channel == "whatsapp",
+                         ProspectMessage.is_followup == True,             # noqa: E712
+                         ProspectMessage.status.in_(["sent", "queued_manual"]),
+                         ProspectMessage.created_at >= start,
+                         ProspectMessage.created_at < end).scalar() or 0)
 
     rpt = MonthlyReport(
         agent_id=agent_id, year=year, month=month,
@@ -516,7 +609,7 @@ def generate_monthly_report(db: Session, year: int, month: int,
         calls_made=_count("call"),
         replies=replies, opt_outs=opt_outs,
     )
-    rpt.summary_text = _report_summary_text(rpt)
+    rpt.summary_text = _report_summary_text(rpt, followups)
     db.add(rpt)
     db.commit()
     db.refresh(rpt)
@@ -528,8 +621,9 @@ def generate_monthly_report(db: Session, year: int, month: int,
     return rpt
 
 
-def _report_summary_text(r: MonthlyReport) -> str:
+def _report_summary_text(r: MonthlyReport, followups: int = 0) -> str:
     total_wa = r.whatsapp_sent_il + r.whatsapp_sent_us
+    reply_rate = f"{(r.replies / total_wa * 100):.0f}%" if total_wa else "—"
     return (
         f"סיכום פעילות שיווק — {r.month:02d}/{r.year}\n"
         f"{'='*40}\n"
@@ -537,9 +631,10 @@ def _report_summary_text(r: MonthlyReport) -> str:
         f"WhatsApp (ישראל):        {r.whatsapp_sent_il}\n"
         f"WhatsApp (ארה\"ב):        {r.whatsapp_sent_us}\n"
         f"WhatsApp סה\"כ:            {total_wa}\n"
+        f"  מתוכן פולואפים:         {followups}\n"
         f"מיילים:                   {r.emails_sent}\n"
         f"LinkedIn:                {r.linkedin_sent}\n"
         f"שיחות:                    {r.calls_made}\n"
-        f"תגובות שהתקבלו:           {r.replies}\n"
+        f"תגובות שהתקבלו:           {r.replies}  ({reply_rate})\n"
         f"הסרות מרשימה:             {r.opt_outs}\n"
     )

@@ -102,6 +102,10 @@ email and LinkedIn, then rolls everything up at month end.
 - Every morning builds a batch of **10 WhatsApp messages to Israeli owners + 5 to
   American owners**, each personalised by Claude (Hebrew for IL, English for US).
 - Sends one message per hour during business hours (auto mode).
+- **Automatic follow-up sequence:** anyone who doesn't reply gets a gentle
+  follow-up on day 3 and a final one on day 7, then stops. Follow-ups take
+  priority *inside* the daily cap (they convert better), so total volume stays
+  safe. Most closes come from follow-ups, not the first message.
 - When a prospect replies, **emails you the reply immediately**.
 - **Sources new numbers automatically every day** via the official Google Places
   API — the phone a business *published* for contact (for a solo business, usually

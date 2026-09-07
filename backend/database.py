@@ -241,6 +241,8 @@ class Prospect(Base):
     status         = Column(String(20), default=ProspectStatus.NEW)
     opted_out      = Column(Boolean, default=False)
     last_contacted_at = Column(DateTime, nullable=True)
+    followup_count    = Column(Integer, default=0)      # how many follow-ups sent
+    last_followup_at  = Column(DateTime, nullable=True)
     notes          = Column(Text, nullable=True)
     created_at     = Column(DateTime, default=datetime.utcnow)
 
@@ -259,6 +261,8 @@ class ProspectMessage(Base):
     subject      = Column(String(500), nullable=True)   # email subject
     wa_link      = Column(String(600), nullable=True)   # click-to-send link (manual mode)
     mode         = Column(String(10), default="manual") # manual | auto
+    is_followup  = Column(Boolean, default=False)       # first-contact vs follow-up
+    template_name= Column(String(120), nullable=True)   # Cloud API template to use
     status       = Column(String(20), default="pending")# pending | sent | queued_manual | failed
     external_id  = Column(String(200), nullable=True)
     sent_at      = Column(DateTime, nullable=True)
@@ -298,3 +302,30 @@ def get_db():
 
 def create_tables():
     Base.metadata.create_all(bind=engine)
+    _migrate_add_columns()
+
+
+# Lightweight additive migration: add new columns to existing tables without
+# dropping data. Safe to run on every startup (ignores "already exists").
+_MIGRATIONS = [
+    ("prospects",         "followup_count",  "INTEGER DEFAULT 0"),
+    ("prospects",         "last_followup_at", "TIMESTAMP"),
+    ("prospect_messages", "is_followup",      "BOOLEAN DEFAULT 0"),
+    ("prospect_messages", "template_name",    "VARCHAR(120)"),
+]
+
+def _migrate_add_columns():
+    from sqlalchemy import inspect, text
+    insp = inspect(engine)
+    existing_tables = set(insp.get_table_names())
+    with engine.begin() as conn:
+        for table, col, coltype in _MIGRATIONS:
+            if table not in existing_tables:
+                continue
+            cols = {c["name"] for c in insp.get_columns(table)}
+            if col in cols:
+                continue
+            try:
+                conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {col} {coltype}'))
+            except Exception:
+                pass

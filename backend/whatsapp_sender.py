@@ -56,10 +56,46 @@ OPT_OUT = {
 }
 
 
-def render_template(language: str, name: str = "", business: str = "") -> str:
-    tmpl = TEMPLATE_TEXT.get(language, TEMPLATE_TEXT["en"])
+# Follow-up templates (also need Meta approval — a non-replier is outside the 24h
+# window). {{1}}=name, {{2}}=business. Set the *_NAME vars once approved.
+FOLLOWUP1_NAME = os.getenv("WHATSAPP_TEMPLATE_FOLLOWUP1", "")
+FOLLOWUP2_NAME = os.getenv("WHATSAPP_TEMPLATE_FOLLOWUP2", "")
+
+FOLLOWUP_TEXT = {
+    1: {
+        "he": "היי {name}, רק מוודא שההודעה הקודמת הגיעה 🙂 אשמח לשלוח לך את דוגמת דף "
+              "הנחיתה שהכנתי ל{business} — בלי שום התחייבות. שאשלח?",
+        "en": "Hi {name}, just checking my earlier message reached you 🙂 I'd be glad to "
+              "send over the sample landing page I made for {business} — no obligation at all. "
+              "Want me to?",
+    },
+    2: {
+        "he": "היי {name}, לא רוצה להציק — אם זה לא רלוונטי כרגע, לגמרי בסדר. הדוגמה עדיין "
+              "מוכנה אם תרצה/י להציץ. בהצלחה עם {business}! 🙏",
+        "en": "Hi {name}, I won't keep bugging you — if it's not relevant right now, that's "
+              "totally fine. The sample is still ready if you'd like a peek. Wishing you lots "
+              "of success with {business}! 🙏",
+    },
+}
+
+
+def _fill(tmpl: str, language: str, name: str, business: str) -> str:
     return tmpl.format(name=name or ("there" if language == "en" else "שלום"),
                        business=business or ("your business" if language == "en" else "העסק שלך"))
+
+
+def render_template(language: str, name: str = "", business: str = "") -> str:
+    return _fill(TEMPLATE_TEXT.get(language, TEMPLATE_TEXT["en"]), language, name, business)
+
+
+def render_followup(stage: int, language: str, name: str = "", business: str = "") -> str:
+    stage = 2 if stage >= 2 else 1
+    return _fill(FOLLOWUP_TEXT[stage].get(language, FOLLOWUP_TEXT[stage]["en"]),
+                 language, name, business)
+
+
+def followup_template_name(stage: int) -> str:
+    return FOLLOWUP2_NAME if stage >= 2 else FOLLOWUP1_NAME
 
 
 def normalize_phone(raw: str, default_country: str = "") -> str:
@@ -114,7 +150,8 @@ class WhatsAppSender:
             return {"ok": False, "reason": str(exc)}
 
     def send(self, phone: str, message: str, language: str = "he",
-             template_params: Optional[list] = None) -> Tuple[str, Optional[str], str]:
+             template_params: Optional[list] = None,
+             template_name: Optional[str] = None) -> Tuple[str, Optional[str], str]:
         """
         Returns (status, external_id, link).
           status == "sent"          -> delivered via Cloud API (external_id set)
@@ -133,12 +170,13 @@ class WhatsAppSender:
             return "queued_manual", None, link
 
         to = re.sub(r"[^\d]", "", phone or "")
-        use_template = bool(TEMPLATE_NAME and template_params is not None)
+        tmpl = template_name if template_name is not None else TEMPLATE_NAME
+        use_template = bool(tmpl and template_params is not None)
         if use_template:
             payload = {
                 "messaging_product": "whatsapp", "to": to, "type": "template",
                 "template": {
-                    "name": TEMPLATE_NAME,
+                    "name": tmpl,
                     "language": {"code": TEMPLATE_LANG.get(language, "en_US")},
                     "components": [{
                         "type": "body",
