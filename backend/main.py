@@ -1248,6 +1248,31 @@ def run_marketing_batch(token: str = Query(""), db: Session = Depends(get_db)):
     return mk.build_daily_batch(db)
 
 
+@app.get("/lp/{slug}")
+def serve_landing_page(slug: str, db: Session = Depends(get_db)):
+    """Serve a generated personalised landing page (created when a prospect said yes)."""
+    from fastapi.responses import HTMLResponse
+    from database import LandingPage
+    lp = db.query(LandingPage).filter(LandingPage.slug == slug).first()
+    if not lp:
+        raise HTTPException(404, "page not found")
+    lp.views = (lp.views or 0) + 1
+    db.commit()
+    return HTMLResponse(content=lp.html)
+
+
+@app.post("/marketing/prospects/{prospect_id}/landing")
+def make_landing_page(prospect_id: int, db: Session = Depends(get_db)):
+    """Manually generate (or fetch) a prospect's personalised landing page + link."""
+    from database import Prospect
+    from landing_generator import get_or_create_landing, landing_url
+    p = db.query(Prospect).filter(Prospect.id == prospect_id).first()
+    if not p:
+        raise HTTPException(404, "prospect not found")
+    lp = get_or_create_landing(db, p)
+    return {"slug": lp.slug, "url": landing_url(lp), "views": lp.views}
+
+
 @app.get("/marketing/whatsapp/status")
 def whatsapp_status():
     """Diagnostic: is the WhatsApp Cloud API wired correctly? Reveals no secrets."""

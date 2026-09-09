@@ -243,6 +243,7 @@ class Prospect(Base):
     last_contacted_at = Column(DateTime, nullable=True)
     followup_count    = Column(Integer, default=0)      # how many follow-ups sent
     last_followup_at  = Column(DateTime, nullable=True)
+    human_takeover    = Column(Boolean, default=False)  # stop auto-replies, user handles it
     notes          = Column(Text, nullable=True)
     created_at     = Column(DateTime, default=datetime.utcnow)
 
@@ -262,6 +263,7 @@ class ProspectMessage(Base):
     wa_link      = Column(String(600), nullable=True)   # click-to-send link (manual mode)
     mode         = Column(String(10), default="manual") # manual | auto
     is_followup  = Column(Boolean, default=False)       # first-contact vs follow-up
+    is_auto      = Column(Boolean, default=False)       # AI auto-reply (vs human)
     template_name= Column(String(120), nullable=True)   # Cloud API template to use
     status       = Column(String(20), default="pending")# pending | sent | queued_manual | failed
     external_id  = Column(String(200), nullable=True)
@@ -292,6 +294,18 @@ class MonthlyReport(Base):
     summary_text      = Column(Text, nullable=True)
 
 
+class LandingPage(Base):
+    """A personalised demo landing page, generated when a prospect says yes."""
+    __tablename__ = "landing_pages"
+
+    id          = Column(Integer, primary_key=True)
+    prospect_id = Column(Integer, ForeignKey("prospects.id"))
+    slug        = Column(String(40), unique=True, nullable=False)
+    html        = Column(Text, nullable=False)
+    views       = Column(Integer, default=0)
+    created_at  = Column(DateTime, default=datetime.utcnow)
+
+
 def get_db():
     db = SessionLocal()
     try:
@@ -310,7 +324,9 @@ def create_tables():
 _MIGRATIONS = [
     ("prospects",         "followup_count",  "INTEGER DEFAULT 0"),
     ("prospects",         "last_followup_at", "TIMESTAMP"),
+    ("prospects",         "human_takeover",   "BOOLEAN DEFAULT 0"),
     ("prospect_messages", "is_followup",      "BOOLEAN DEFAULT 0"),
+    ("prospect_messages", "is_auto",          "BOOLEAN DEFAULT 0"),
     ("prospect_messages", "template_name",    "VARCHAR(120)"),
 ]
 

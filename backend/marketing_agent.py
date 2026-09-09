@@ -36,8 +36,10 @@ from whatsapp_sender import (
 logger = logging.getLogger(__name__)
 
 # ── Config (env-overridable) ───────────────────────────────────────────────────
-IL_DAILY_CAP = int(os.getenv("MK_IL_DAILY_CAP", "10"))
+IL_DAILY_CAP = int(os.getenv("MK_IL_DAILY_CAP", "15"))   # 15 IL + 5 US = 20/day
 US_DAILY_CAP = int(os.getenv("MK_US_DAILY_CAP", "5"))
+AUTO_REPLY_ENABLED = os.getenv("MK_AUTO_REPLY", "true").lower() == "true"
+MAX_AUTO_REPLIES   = int(os.getenv("MK_MAX_AUTO_REPLIES", "4"))
 # Follow-up cadence (days since the previous touch) and how many follow-ups max.
 FOLLOWUP1_DAYS = int(os.getenv("MK_FOLLOWUP1_DAYS", "3"))
 FOLLOWUP2_DAYS = int(os.getenv("MK_FOLLOWUP2_DAYS", "4"))   # days after follow-up #1
@@ -188,22 +190,162 @@ def handle_inbound_reply(db: Session, phone: str, text: str,
 
     prospect.status = ProspectStatus.REPLIED
     db.commit()
-    _alert_reply(prospect, text, channel)
-    return {"prospect_id": prospect.id, "replied": True}
+
+    # Auto-reply, adapted to what they wrote (within WhatsApp's 24h window, free
+    # text is allowed since the prospect messaged us — no template needed).
+    auto_text = None
+    if AUTO_REPLY_ENABLED and not prospect.human_takeover:
+        auto_replies = (db.query(func.count(ProspectMessage.id))
+                        .filter(ProspectMessage.prospect_id == prospect.id,
+                                ProspectMessage.is_auto == True).scalar() or 0)  # noqa: E712
+        if auto_replies >= MAX_AUTO_REPLIES:
+            prospect.human_takeover = True
+            db.commit()
+        else:
+            auto_text, handoff = generate_reply(db, prospect, text)
+            # If they said yes / want to see it -> build a personalised landing page
+            # now and include the link in the reply.
+            if _wants_page(text):
+                try:
+                    from landing_generator import get_or_create_landing, landing_url
+                    lp = get_or_create_landing(db, prospect)
+                    link = landing_url(lp)
+                    auto_text = (auto_text + "\n\n" +
+                                 (f"הכנתי לך דוגמה ראשונית — קפוץ/י להציץ: {link}"
+                                  if prospect.language == "he" else
+                                  f"I put together an initial sample for you — take a look: {link}"))
+                except Exception as exc:
+                    logger.error("landing page generation failed: %s", exc)
+            wa = WhatsAppSender()
+            if wa.auto_enabled:
+                status, ext_id, _ = wa.send(prospect.phone, auto_text, prospect.language)
+                db.add(ProspectMessage(
+                    prospect_id=prospect.id, channel=channel, direction="outbound",
+                    content=auto_text, mode="auto", is_auto=True,
+                    status="sent" if status == "sent" else "failed",
+                    external_id=ext_id, sent_at=datetime.utcnow()))
+            else:
+                # manual mode: log the suggested reply so the alert can carry it
+                db.add(ProspectMessage(
+                    prospect_id=prospect.id, channel=channel, direction="outbound",
+                    content=auto_text, mode="manual", is_auto=True, status="queued_manual"))
+            if handoff:
+                prospect.human_takeover = True
+            db.commit()
+
+    _alert_reply(prospect, text, channel, suggested=auto_text,
+                 handoff=prospect.human_takeover)
+    return {"prospect_id": prospect.id, "replied": True,
+            "auto_reply": auto_text, "handoff": prospect.human_takeover}
 
 
-def _alert_reply(prospect: Prospect, text: str, channel: str):
+def _conversation_history(db: Session, prospect: Prospect, limit: int = 12):
+    rows = (db.query(ProspectMessage)
+            .filter(ProspectMessage.prospect_id == prospect.id,
+                    ProspectMessage.channel.in_(["whatsapp"]))
+            .order_by(ProspectMessage.created_at.asc()).all())
+    hist = []
+    for m in rows[-limit:]:
+        hist.append({"role": "user" if m.direction == "inbound" else "assistant",
+                     "content": m.content or ""})
+    return hist
+
+
+def generate_reply(db: Session, prospect: Prospect, new_message: str):
+    """Claude-generated reply adapted to the prospect's message.
+    Returns (reply_text, needs_handoff)."""
+    lang = "Hebrew" if prospect.segment == "IL" else "English"
+    sender = SENDER_NAME if prospect.segment == "IL" else SENDER_NAME_EN
+    biz = prospect.business_name or ""
+    fallback = ("תודה על התשובה! אשמח לשלוח לך את דוגמת דף הנחיתה — מתי נוח לך שנדבר?"
+                if prospect.segment == "IL" else
+                "Thanks for getting back to me! I'd love to send over the sample landing "
+                "page — when's a good time to talk?")
+    if not _ANTHROPIC_KEY:
+        return fallback, is_opt_out(new_message) is False and _intent(new_message)
+
+    history = _conversation_history(db, prospect, limit=10)
+    system = (
+        f"You are {sender}, a friendly landing-page designer chatting on WhatsApp in {lang} "
+        f"with a small-business owner"
+        + (f" who runs {biz}" if biz else "") + ". "
+        "You already offered to build them a sample landing page. Reply naturally to their "
+        "latest message: answer questions simply, keep it short (1-3 sentences), warm and "
+        "human, never pushy. Your goal is to get them to say yes to seeing the free sample or "
+        "to a quick call. If they ask price, give a friendly range (a landing page from ~1500 "
+        "NIS) and pivot to showing the sample first. "
+        "At the very end of your reply, on a new line, output a JSON object exactly like "
+        '{\"handoff\": true|false} — true when they show real buying intent (want to schedule, '
+        "ask to pay, give an address/time, or ask something you can't answer). Output nothing "
+        "after that JSON line."
+    )
+    try:
+        resp = httpx.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": _ANTHROPIC_KEY, "anthropic-version": "2023-06-01",
+                     "content-type": "application/json"},
+            json={"model": _MODEL, "max_tokens": 350, "system": system,
+                  "messages": history + [{"role": "user", "content": new_message}]},
+            timeout=25,
+        )
+        data = resp.json()
+        if resp.status_code >= 400 or not data.get("content"):
+            logger.warning("Claude reply error: %s", data)
+            return fallback, _intent(new_message)
+        full = data["content"][0]["text"].strip()
+        handoff = False
+        lines = full.splitlines()
+        if lines and lines[-1].strip().startswith("{"):
+            import json
+            try:
+                handoff = bool(json.loads(lines[-1]).get("handoff", False))
+                full = "\n".join(lines[:-1]).strip()
+            except Exception:
+                pass
+        return full, handoff
+    except Exception as exc:
+        logger.error("generate_reply failed: %s", exc)
+        return fallback, _intent(new_message)
+
+
+_INTENT_WORDS = {"מחיר", "כמה עולה", "לשלם", "תשלום", "מתי", "לקבוע", "פגישה", "טלפון",
+                 "price", "cost", "pay", "schedule", "call", "meeting", "when can"}
+
+def _intent(text: str) -> bool:
+    t = (text or "").lower()
+    return any(w in t for w in _INTENT_WORDS)
+
+
+_YES_WORDS = {"כן", "מעוניין", "מעוניינת", "אשמח", "בטח", "שלח", "שלחי", "שלחו", "רוצה",
+              "מעניין אותי", "בוא", "נשמע טוב", "yes", "sure", "sounds good", "send",
+              "interested", "go ahead", "please do", "ok", "okay"}
+
+def _wants_page(text: str) -> bool:
+    t = (text or "").strip().lower()
+    return any(w in t for w in _YES_WORDS)
+
+
+def _alert_reply(prospect: Prospect, text: str, channel: str,
+                 suggested: str = None, handoff: bool = False):
     """Email the user immediately when a prospect answers."""
     if not REPORT_EMAIL:
         return
     who = " / ".join(x for x in [prospect.name, prospect.business_name] if x) or prospect.phone
+    hb = "\n⚠️ הליד מוכן להתקדם — כדאי שתיכנס אתה לשיחה!\n" if handoff else ""
+    if suggested:
+        wa = WhatsAppSender()
+        how = "הסוכן כבר שלח את התשובה הזו:" if wa.auto_enabled else "תשובה מוכנה שהכנתי לך (העתק/שלח):"
+        sug = f"\n🤖 {how}\n\"{suggested}\"\n"
+    else:
+        sug = ""
     body = (
         f"🔔 תגובה חדשה מליד!\n\n"
         f"מ:      {who}\n"
         f"טלפון:  {prospect.phone or '—'}\n"
         f"ערוץ:   {channel}\n"
         f"מקטע:   {prospect.segment}\n\n"
-        f"ההודעה:\n\"{text}\"\n\n"
+        f"ההודעה שלו:\n\"{text}\"\n"
+        f"{sug}{hb}\n"
         f"קישור לשיחה: {wa_link(prospect.phone or '', '')}\n"
     )
     try:

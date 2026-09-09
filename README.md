@@ -106,7 +106,13 @@ email and LinkedIn, then rolls everything up at month end.
   follow-up on day 3 and a final one on day 7, then stops. Follow-ups take
   priority *inside* the daily cap (they convert better), so total volume stays
   safe. Most closes come from follow-ups, not the first message.
-- When a prospect replies, **emails you the reply immediately**.
+- When a prospect replies, **emails you the reply immediately** — with an
+  AI-drafted answer (auto-sent in Cloud API mode; ready to copy in manual mode).
+- **Landing page on "yes":** when a prospect agrees to see a sample, the agent
+  generates a personalised demo landing page branded with their business name and
+  sends them the link. Pages are served at `/lp/{slug}` and tracked for views.
+  (We don't scrape Instagram — photo slots are placeholders you fill with the
+  business's real photos; a handle, if provided, is linked.)
 - **Sources new numbers automatically every day** via the official Google Places
   API — the phone a business *published* for contact (for a solo business, usually
   the owner's own mobile). Configure with `GOOGLE_PLACES_API_KEY` +
