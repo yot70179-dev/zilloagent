@@ -19,6 +19,21 @@ from database import LandingPage, Prospect
 PUBLIC_URL = os.getenv("MK_PUBLIC_URL", "").rstrip("/")
 
 
+def _hero_media(p: Prospect, photo_label: str) -> str:
+    """Real Google photo via the key-safe proxy, else a placeholder slot."""
+    if p.photo_ref:
+        return (f'<img src="/lp/img/{escape(p.photo_ref)}" alt="" '
+                f'style="width:100%;height:100%;object-fit:cover;border-radius:20px">')
+    return f'<div class="slot">{photo_label}</div>'
+
+
+def _stars(rating) -> str:
+    if not rating:
+        return ""
+    full = int(round(rating))
+    return "★" * full + "☆" * (5 - full)
+
+
 def _page_html(p: Prospect) -> str:
     he = p.segment != "US"
     biz = escape(p.business_name or (p.name or ("העסק שלך" if he else "Your Business")))
@@ -34,6 +49,17 @@ def _page_html(p: Prospect) -> str:
                  if he else "Initial sample built for " + biz + " · by Yotam")
     ig_link = (f'<a class="ig" href="{escape(ig)}" target="_blank" rel="noopener">'
                + ("עקבו אחרינו באינסטגרם" if he else "Follow us on Instagram") + "</a>") if ig else ""
+    hero_media = _hero_media(p, photo)
+    stars = _stars(p.rating)
+    rating_html = (f'<div style="color:var(--acc);font-size:1.3rem;margin-top:1rem">{stars} '
+                   f'<span style="color:var(--mut);font-size:1rem">{p.rating} בגוגל</span></div>'
+                   if p.rating else "")
+    review_html = (f'<section><div class="wrap" style="text-align:center;max-width:640px">'
+                   f'<div style="color:var(--acc);font-size:1.4rem">{stars}</div>'
+                   f'<p style="font-size:1.3rem;margin:1rem 0;font-family:\'Secular One\'">'
+                   f'"{escape(p.review)}"</p>'
+                   f'<p style="color:var(--mut)">{"— ביקורת אמיתית מגוגל" if he else "— a real Google review"}</p>'
+                   f'</div></section>') if p.review else ""
     return f"""<!doctype html><html lang="{'he' if he else 'en'}" dir="{dir_}"><head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{biz}</title>
@@ -71,9 +97,10 @@ font-weight:700;font-size:.8rem;padding:.4rem 1rem;border-radius:999px;display:i
 <div><span class="eyebrow">{biz}</span>
 <h1>{tagline.split(' ')[0]} <span>{' '.join(tagline.split(' ')[1:])}</span></h1>
 <p class="lead">{sub}</p>
-<a class="btn" href="#contact">{cta}</a>{ig_link}</div>
-<div class="slot">{photo}</div>
+<a class="btn" href="#contact">{cta}</a>{ig_link}{rating_html}</div>
+<div style="aspect-ratio:4/5">{hero_media}</div>
 </div></header>
+{review_html}
 <section><div class="wrap">
 <div class="flag">{demo_note}</div>
 <div class="cards">

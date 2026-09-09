@@ -240,6 +240,11 @@ class Prospect(Base):
 
     status         = Column(String(20), default=ProspectStatus.NEW)
     opted_out      = Column(Boolean, default=False)
+    # enrichment pulled from Google Places (real photos + text for the landing page)
+    rating         = Column(Float, nullable=True)
+    address        = Column(String(400), nullable=True)
+    photo_ref      = Column(String(500), nullable=True)  # Google Places photo reference
+    review         = Column(Text, nullable=True)         # a real review snippet
     last_contacted_at = Column(DateTime, nullable=True)
     followup_count    = Column(Integer, default=0)      # how many follow-ups sent
     last_followup_at  = Column(DateTime, nullable=True)
@@ -325,6 +330,10 @@ _MIGRATIONS = [
     ("prospects",         "followup_count",  "INTEGER DEFAULT 0"),
     ("prospects",         "last_followup_at", "TIMESTAMP"),
     ("prospects",         "human_takeover",   "BOOLEAN DEFAULT 0"),
+    ("prospects",         "rating",           "REAL"),
+    ("prospects",         "address",          "VARCHAR(400)"),
+    ("prospects",         "photo_ref",        "VARCHAR(500)"),
+    ("prospects",         "review",           "TEXT"),
     ("prospect_messages", "is_followup",      "BOOLEAN DEFAULT 0"),
     ("prospect_messages", "is_auto",          "BOOLEAN DEFAULT 0"),
     ("prospect_messages", "template_name",    "VARCHAR(120)"),

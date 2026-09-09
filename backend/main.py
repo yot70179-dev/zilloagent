@@ -1261,6 +1261,26 @@ def serve_landing_page(slug: str, db: Session = Depends(get_db)):
     return HTMLResponse(content=lp.html)
 
 
+@app.get("/lp/img/{photo_ref}")
+def landing_photo(photo_ref: str):
+    """Proxy a Google Places photo so the API key never appears in the page HTML."""
+    from fastapi.responses import Response, RedirectResponse
+    key = os.getenv("GOOGLE_PLACES_API_KEY", "")
+    if not key:
+        return RedirectResponse("/")
+    try:
+        r = httpx.get("https://maps.googleapis.com/maps/api/place/photo",
+                      params={"maxwidth": "900", "photo_reference": photo_ref, "key": key},
+                      follow_redirects=True, timeout=15)
+        if r.status_code < 400 and r.content:
+            return Response(content=r.content,
+                            media_type=r.headers.get("content-type", "image/jpeg"),
+                            headers={"Cache-Control": "public, max-age=86400"})
+    except Exception as exc:
+        logger.error("photo proxy failed: %s", exc)
+    raise HTTPException(404, "photo unavailable")
+
+
 @app.post("/marketing/prospects/{prospect_id}/landing")
 def make_landing_page(prospect_id: int, db: Session = Depends(get_db)):
     """Manually generate (or fetch) a prospect's personalised landing page + link."""

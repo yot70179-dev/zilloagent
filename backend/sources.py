@@ -46,24 +46,37 @@ def _parse_queries() -> List[tuple]:
     return out
 
 
-def _place_phone_and_name(place_id: str) -> tuple:
-    """Fetch the phone the business published + its name (one Details call)."""
+def _place_details(place_id: str) -> dict:
+    """Fetch published phone + name + real photo/rating/review (one Details call)."""
     try:
         r = httpx.get(_DETAILS, params={
             "place_id": place_id,
-            "fields": "name,formatted_phone_number,international_phone_number",
+            "fields": ("name,formatted_phone_number,international_phone_number,"
+                       "rating,formatted_address,photos,reviews"),
             "key": PLACES_KEY,
         }, timeout=15)
         d = (r.json() or {}).get("result", {})
         phone = d.get("international_phone_number") or d.get("formatted_phone_number") or ""
-        return d.get("name", ""), phone
+        photos = d.get("photos") or []
+        reviews = d.get("reviews") or []
+        # pick the best short review (4★+ and not too long)
+        review = ""
+        for rv in sorted(reviews, key=lambda x: -(x.get("rating") or 0)):
+            t = (rv.get("text") or "").strip()
+            if t and (rv.get("rating") or 0) >= 4 and len(t) <= 220:
+                review = t
+                break
+        return {"name": d.get("name", ""), "phone": phone,
+                "rating": d.get("rating"), "address": d.get("formatted_address", ""),
+                "photo_ref": (photos[0].get("photo_reference") if photos else None),
+                "review": review}
     except Exception as exc:
         logger.error("Places details failed for %s: %s", place_id, exc)
-        return "", ""
+        return {}
 
 
 def fetch_from_google_places(segment: str, query: str, limit: int) -> List[dict]:
-    """Return [{business_name, phone, source}] for a text query."""
+    """Return enriched prospects (name, phone, photo, rating, review) for a query."""
     if not PLACES_KEY:
         logger.warning("GOOGLE_PLACES_API_KEY not set — auto-sourcing disabled.")
         return []
@@ -71,11 +84,12 @@ def fetch_from_google_places(segment: str, query: str, limit: int) -> List[dict]
     try:
         r = httpx.get(_TEXTSEARCH, params={"query": query, "key": PLACES_KEY}, timeout=20)
         for place in (r.json() or {}).get("results", [])[:limit]:
-            name, phone = _place_phone_and_name(place.get("place_id", ""))
-            if not phone:
+            d = _place_details(place.get("place_id", ""))
+            if not d.get("phone"):
                 continue
-            results.append({"business_name": name or place.get("name", ""),
-                            "phone": phone, "source": f"google_places:{query}"})
+            d["business_name"] = d.get("name") or place.get("name", "")
+            d["source"] = f"google_places:{query}"
+            results.append(d)
     except Exception as exc:
         logger.error("Places textsearch failed (%s): %s", query, exc)
     return results
@@ -100,8 +114,15 @@ def auto_source_prospects(db: Session, daily_max: int = DAILY_MAX) -> int:
             if added >= daily_max:
                 break
             before = db.query(Prospect).count()
-            add_prospect(db, segment=segment, business_name=item["business_name"],
-                         phone=item["phone"], source=item["source"])
+            p = add_prospect(db, segment=segment, business_name=item["business_name"],
+                             phone=item["phone"], source=item["source"])
+            # attach enrichment (photo/rating/review) for the landing page
+            if p and (item.get("photo_ref") or item.get("rating") or item.get("review")):
+                p.photo_ref = p.photo_ref or item.get("photo_ref")
+                p.rating = p.rating or item.get("rating")
+                p.address = p.address or item.get("address")
+                p.review = p.review or item.get("review")
+                db.commit()
             if db.query(Prospect).count() > before:
                 added += 1
     logger.info("Auto-sourcing added %d new prospects", added)
